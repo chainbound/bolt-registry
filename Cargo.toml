@@ -14,17 +14,19 @@ resolver = "2"
 [dependencies]
 # async
 tokio = { version = "1.42", features = ["sync"] }
+reqwest = { version = "0.12", features = ["json"] }
 
 # ethereum
 alloy = { version = "0.9.1", features = ["consensus", "rpc-types", "reqwest"] }
 
 # crypto
-bls = { git = "https://github.com/sigp/lighthouse", tag = "v6.0.1" }
+bls = { git = "https://github.com/sigp/lighthouse", tag = "v6.0.1", features = [
+    "supranational",
+] }
 
 # types
 url = { version = "2.5.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
-
 
 [lints]
 rust.missing_debug_implementations = "warn"

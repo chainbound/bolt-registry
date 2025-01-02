@@ -5,6 +5,8 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::watch;
 
+mod head_tracker;
+
 enum SyncState {
     /// The syncer is currently syncing the registry.
     Syncing,
@@ -23,6 +25,7 @@ impl SyncHandle {
         matches!(*self.state.borrow(), SyncState::Syncing)
     }
 
+    /// Resolves when the syncer is done syncing the registry.
     pub(crate) async fn wait_for_sync(&mut self) {
         while !matches!(*self.state.borrow(), SyncState::Synced) {
             // NOTE: we panic here because the registry should fail if the syncer is dropped.

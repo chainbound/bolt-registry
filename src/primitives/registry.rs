@@ -35,8 +35,8 @@ pub(crate) struct Deregistration {
 /// An entry in the validator registry.
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct RegistryEntry {
-    validator_pubkey: BlsPublicKey,
-    operator: Address,
-    gas_limit: u64,
-    rpc_endpoint: Url,
+    pub(crate) validator_pubkey: BlsPublicKey,
+    pub(crate) operator: Address,
+    pub(crate) gas_limit: u64,
+    pub(crate) rpc_endpoint: Url,
 }
