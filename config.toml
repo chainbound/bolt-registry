@@ -1,0 +1,12 @@
+operators_registry = "0x..."
+
+# Data sources
+# These data sources take precedence over the registry. Their values are canonical.
+#
+# Lido CCCP through the keysAPI:
+[sources.lido]
+type = "kapi"
+base_url = "http://34.88.187.80:30303/v1/preconfs/lido-bolt/validators"
+
+# Postgres database configuration
+[db]

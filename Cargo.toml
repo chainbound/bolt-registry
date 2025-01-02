@@ -1,5 +1,5 @@
 [package]
-name = "TODO"
+name = "bolt-registry"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
@@ -12,6 +12,19 @@ repository = "TODO"
 resolver = "2"
 
 [dependencies]
+# async
+tokio = { version = "1.42", features = ["sync"] }
+
+# ethereum
+alloy = { version = "0.9.1", features = ["consensus", "rpc-types", "reqwest"] }
+
+# crypto
+bls = { git = "https://github.com/sigp/lighthouse", tag = "v6.0.1" }
+
+# types
+url = { version = "2.5.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+
 
 [lints]
 rust.missing_debug_implementations = "warn"
