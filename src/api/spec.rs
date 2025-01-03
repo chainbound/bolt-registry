@@ -15,10 +15,10 @@ pub(super) const VALIDATORS_REGISTER_PATH: &str = "/registry/v1/validators/regis
 pub(super) const VALIDATORS_DEREGISTER_PATH: &str = "/registry/v1/validators/deregister";
 pub(super) const VALIDATORS_REGISTRATIONS_PATH: &str = "/registry/v1/validators/registrations";
 pub(super) const DISCOVERY_VALIDATORS_PATH: &str = "/registry/v1/discovery/validators";
-pub(super) const DISCOVERY_VALIDATOR_PATH: &str = "/registry/v1/discovery/validators/:pubkey";
+pub(super) const DISCOVERY_VALIDATOR_PATH: &str = "/registry/v1/discovery/validators/{pubkey}";
 pub(super) const DISCOVERY_OPERATORS_PATH: &str = "/registry/v1/discovery/operators";
-pub(super) const DISCOVERY_OPERATOR_PATH: &str = "/registry/v1/discovery/operators/:signer";
-pub(super) const DISCOVERY_LOOKAHEAD_PATH: &str = "/registry/v1/discovery/lookahead/:epoch";
+pub(super) const DISCOVERY_OPERATOR_PATH: &str = "/registry/v1/discovery/operators/{signer}";
+pub(super) const DISCOVERY_LOOKAHEAD_PATH: &str = "/registry/v1/discovery/lookahead/{epoch}";
 
 /// The registry API spec for validators.
 pub(super) trait ValidatorSpec {
@@ -65,9 +65,6 @@ pub(super) trait DiscoverySpec {
     /// This will return `TooEarly` if the epoch is too far in the future.
     async fn get_lookahead(&self, epoch: u64) -> Result<Lookahead, RegistryError>;
 }
-
-/// The registry API specification.
-pub(super) trait ApiSpec: ValidatorSpec + DiscoverySpec {}
 
 #[derive(Debug, Error)]
 pub(crate) enum RegistryError {

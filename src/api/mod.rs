@@ -4,9 +4,10 @@
 use axum::{
     extract::{Path, Query, State},
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
 use std::{io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
@@ -22,7 +23,11 @@ use crate::primitives::{
     Address, BlsPublicKey,
 };
 use actions::{Action, ActionStream};
-use spec::{DiscoverySpec, ValidatorSpec, VALIDATORS_REGISTER_PATH};
+use spec::{
+    DiscoverySpec, ValidatorSpec, DISCOVERY_LOOKAHEAD_PATH, DISCOVERY_OPERATORS_PATH,
+    DISCOVERY_OPERATOR_PATH, DISCOVERY_VALIDATORS_PATH, DISCOVERY_VALIDATOR_PATH,
+    VALIDATORS_DEREGISTER_PATH, VALIDATORS_REGISTER_PATH, VALIDATORS_REGISTRATIONS_PATH,
+};
 
 pub(crate) mod actions;
 
@@ -56,6 +61,12 @@ impl Default for ApiConfig {
     }
 }
 
+#[derive(Deserialize, Default)]
+struct ValidatorFilter {
+    pubkeys: Option<Vec<BlsPublicKey>>,
+    indices: Option<Vec<usize>>,
+}
+
 impl RegistryApi {
     /// Creates a new API server with the given configuration. Returns the server that can be
     /// spawned with [`RegistryApi::spawn`], and the action stream on which API queries and commands
@@ -74,8 +85,16 @@ impl RegistryApi {
         let listen_addr = self.cfg.listen_addr;
         let state = Arc::new(self);
 
-        let router =
-            Router::new().route(VALIDATORS_REGISTER_PATH, get(Self::register)).with_state(state);
+        let router = Router::new()
+            .route(VALIDATORS_REGISTER_PATH, post(Self::register))
+            .route(VALIDATORS_DEREGISTER_PATH, post(Self::deregister))
+            .route(VALIDATORS_REGISTRATIONS_PATH, get(Self::get_registrations))
+            .route(DISCOVERY_VALIDATORS_PATH, get(Self::get_validators))
+            .route(DISCOVERY_VALIDATOR_PATH, get(Self::get_validator_by_pubkey))
+            .route(DISCOVERY_OPERATORS_PATH, get(Self::get_operators))
+            .route(DISCOVERY_OPERATOR_PATH, get(Self::get_operator_by_signer))
+            .route(DISCOVERY_LOOKAHEAD_PATH, get(Self::get_lookahead))
+            .with_state(state);
 
         let listener = TcpListener::bind(&listen_addr).await?;
 
@@ -102,22 +121,15 @@ impl RegistryApi {
         api.get_registrations().await.map(Json)
     }
 
-    async fn get_validators(State(api): State<Arc<Self>>) -> impl IntoResponse {
-        api.get_validators().await.map(Json)
-    }
-
-    async fn get_validators_by_pubkeys(
+    async fn get_validators(
         State(api): State<Arc<Self>>,
-        Query(pubkeys): Query<Vec<BlsPublicKey>>,
+        Query(filter): Query<ValidatorFilter>,
     ) -> impl IntoResponse {
-        api.get_validators_by_pubkeys(pubkeys).await.map(Json)
-    }
-
-    async fn get_validators_by_indices(
-        State(api): State<Arc<Self>>,
-        Query(indices): Query<Vec<usize>>,
-    ) -> impl IntoResponse {
-        api.get_validators_by_indices(indices).await.map(Json)
+        match (filter.pubkeys, filter.indices) {
+            (Some(pubkeys), None) => api.get_validators_by_pubkeys(pubkeys).await.map(Json),
+            (None, Some(indices)) => api.get_validators_by_indices(indices).await.map(Json),
+            _ => api.get_validators().await.map(Json),
+        }
     }
 
     async fn get_validator_by_pubkey(

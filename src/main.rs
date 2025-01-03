@@ -16,7 +16,7 @@ mod sync;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let registry = Registry::new(DummyDb);
+    let mut registry = Registry::new(DummyDb);
 
     let (srv, mut actions) = RegistryApi::new(ApiConfig::default());
 
