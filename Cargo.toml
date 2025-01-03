@@ -27,6 +27,7 @@ bls = { git = "https://github.com/sigp/lighthouse", tag = "v6.0.1", features = [
 # types
 url = { version = "2.5.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"
 
 [lints]
 rust.missing_debug_implementations = "warn"

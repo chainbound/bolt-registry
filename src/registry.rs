@@ -1,12 +1,20 @@
-use crate::db::RegistryDb;
+use crate::{
+    db::RegistryDb,
+    sync::{SyncHandle, Syncer},
+};
 
 /// The main registry object.
 pub(crate) struct Registry<Db> {
     db: Db,
+    sync: SyncHandle,
 }
 
-impl<Db: RegistryDb> Registry<Db> {
-    pub(crate) const fn new(db: Db) -> Self {
-        Self { db }
+impl<Db: RegistryDb + Clone> Registry<Db> {
+    pub(crate) fn new(db: Db) -> Self {
+        let (syncer, handle) = Syncer::new(db.clone());
+
+        syncer.spawn();
+
+        Self { db, sync: handle }
     }
 }

@@ -1,9 +1,8 @@
 //! Module `sync` contains functionality for syncing the registry with the chain, and other external
 //! data providers.
+use tokio::{sync::watch, task::JoinHandle};
 
-use std::sync::{Arc, Mutex};
-
-use tokio::sync::watch;
+use crate::db::RegistryDb;
 
 mod head_tracker;
 
@@ -14,7 +13,7 @@ enum SyncState {
     Synced,
 }
 
-struct SyncHandle {
+pub(crate) struct SyncHandle {
     state: watch::Receiver<SyncState>,
 }
 
@@ -28,15 +27,34 @@ impl SyncHandle {
     /// Resolves when the syncer is done syncing the registry.
     pub(crate) async fn wait_for_sync(&mut self) {
         while !matches!(*self.state.borrow(), SyncState::Synced) {
-            // NOTE: we panic here because the registry should fail if the syncer is dropped.
-            self.state.changed().await.expect("Syncer dropped");
+            // NOTE: we panic here because the whole registry process should fail if the syncer is
+            // dropped.
+            self.state.changed().await.expect("Syncer dropped, terminating to avoid unsafe state");
         }
     }
 }
 
 /// Syncer is responsible for syncing the registry with the operators registry contract and other
 /// external data providers.
-struct Syncer<Db> {
+pub(crate) struct Syncer<Db> {
     db: Db,
     state: watch::Sender<SyncState>,
+}
+
+impl<Db: RegistryDb> Syncer<Db> {
+    /// Creates a new syncer with the given database.
+    pub(crate) fn new(db: Db) -> (Self, SyncHandle) {
+        let (state_tx, state_rx) = watch::channel(SyncState::Synced);
+        let syncer = Self { db, state: state_tx };
+        let handle = SyncHandle { state: state_rx };
+
+        (syncer, handle)
+    }
+
+    /// Spawns the [`Syncer`] actor task.
+    pub(crate) fn spawn(self) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            // TODO: handle async logic
+        })
+    }
 }

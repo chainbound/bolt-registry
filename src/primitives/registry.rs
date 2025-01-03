@@ -1,4 +1,6 @@
-use alloy::primitives::Address;
+use std::collections::HashMap;
+
+use alloy::primitives::{Address, U256};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -40,3 +42,15 @@ pub(crate) struct RegistryEntry {
     pub(crate) gas_limit: u64,
     pub(crate) rpc_endpoint: Url,
 }
+
+/// An operator in the registry.
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct Operator {
+    pub(crate) signer: Address,
+    pub(crate) rpc_endpoint: Url,
+    pub(crate) collateral_tokens: Vec<Address>,
+    pub(crate) collateral_amounts: Vec<U256>,
+}
+
+/// A lookahead representation.
+pub(crate) type Lookahead = HashMap<u64, RegistryEntry>;

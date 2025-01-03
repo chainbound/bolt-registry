@@ -2,6 +2,9 @@ use std::ops::{Deref, DerefMut};
 
 use serde::{Deserialize, Serialize};
 
+// re-export primitives from alloy
+pub(crate) use alloy::primitives::*;
+
 pub(crate) mod registry;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

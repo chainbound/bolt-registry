@@ -856,6 +856,7 @@ dependencies = [
  "bls",
  "reqwest",
  "serde",
+ "thiserror",
  "tokio",
  "url",
 ]
