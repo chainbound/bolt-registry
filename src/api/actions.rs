@@ -2,24 +2,24 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::Stream;
 
+use super::spec;
 use crate::primitives::{
-    registry::{Lookahead, Operator, Registration, RegistryEntry},
+    registry::{Deregistration, Lookahead, Operator, Registration, RegistryEntry},
     Address, BlsPublicKey,
 };
-
-use super::spec;
 
 /// An action to be executed by upstream services.
 /// Actions are a mix of commands and queries.
 pub(crate) enum Action {
     Register {
+        registration: Registration,
         response: oneshot::Sender<Result<(), spec::RegistryError>>,
     },
     Deregister {
+        deregistration: Deregistration,
         response: oneshot::Sender<Result<(), spec::RegistryError>>,
     },
     GetRegistrations {
@@ -35,6 +35,13 @@ pub(crate) enum Action {
     GetValidatorsByIndices {
         indices: Vec<usize>,
         response: oneshot::Sender<Result<Vec<RegistryEntry>, spec::RegistryError>>,
+    },
+    GetValidatorByPubkey {
+        pubkey: BlsPublicKey,
+        response: oneshot::Sender<Result<RegistryEntry, spec::RegistryError>>,
+    },
+    GetOperators {
+        response: oneshot::Sender<Result<Vec<Operator>, spec::RegistryError>>,
     },
     GetLookahead {
         epoch: u64,

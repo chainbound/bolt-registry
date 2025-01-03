@@ -1,7 +1,11 @@
 //! The API specification for the registry, and its errors. Contains 2 sub-specs: [`ValidatorSpec`]
 //! and [`DiscoverySpec`]. The [`ApiSpec`] trait combines both of these.
+use axum::{http::StatusCode, response::IntoResponse, Json};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio::sync::{mpsc::error::SendTimeoutError, oneshot::error::RecvError};
 
+use super::actions::Action;
 use crate::primitives::{
     registry::{Deregistration, Lookahead, Operator, Registration, RegistryEntry},
     Address, BlsPublicKey,
@@ -66,4 +70,26 @@ pub(super) trait DiscoverySpec {
 pub(super) trait ApiSpec: ValidatorSpec + DiscoverySpec {}
 
 #[derive(Debug, Error)]
-pub(crate) enum RegistryError {}
+pub(crate) enum RegistryError {
+    #[error("Internal Server Error")]
+    BufferFull(#[from] SendTimeoutError<Action>),
+    #[error("Internal Server Error")]
+    ReponseChannelDropped(#[from] RecvError),
+}
+
+impl IntoResponse for RegistryError {
+    fn into_response(self) -> axum::response::Response {
+        json_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+            .into_response()
+    }
+}
+
+fn json_error_response(status: StatusCode, message: &str) -> impl IntoResponse {
+    #[derive(Serialize, Deserialize)]
+    struct ErrorBody<'a> {
+        code: u16,
+        message: &'a str,
+    }
+
+    (status, Json(ErrorBody { code: status.as_u16(), message })).into_response()
+}

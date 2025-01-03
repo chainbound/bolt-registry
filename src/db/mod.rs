@@ -3,3 +3,8 @@
 
 /// Registry database trait.
 pub(crate) trait RegistryDb {}
+
+#[derive(Debug, Clone)]
+pub(crate) struct DummyDb;
+
+impl RegistryDb for DummyDb {}
