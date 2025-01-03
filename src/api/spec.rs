@@ -1,5 +1,5 @@
-//! The API specification for the registry. Contains 2 sub-specs: [`ValidatorSpec`] and
-//! [`DiscoverySpec`]. The [`ApiSpec`] trait combines both of these.
+//! The API specification for the registry, and its errors. Contains 2 sub-specs: [`ValidatorSpec`]
+//! and [`DiscoverySpec`]. The [`ApiSpec`] trait combines both of these.
 use thiserror::Error;
 
 use crate::primitives::{
@@ -7,16 +7,22 @@ use crate::primitives::{
     Address, BlsPublicKey,
 };
 
-#[derive(Debug, Error)]
-pub(crate) enum RegistryError {}
+pub(super) const VALIDATORS_REGISTER_PATH: &str = "/registry/v1/validators/register";
+pub(super) const VALIDATORS_DEREGISTER_PATH: &str = "/registry/v1/validators/deregister";
+pub(super) const VALIDATORS_REGISTRATIONS_PATH: &str = "/registry/v1/validators/registrations";
+pub(super) const DISCOVERY_VALIDATORS_PATH: &str = "/registry/v1/discovery/validators";
+pub(super) const DISCOVERY_VALIDATOR_PATH: &str = "/registry/v1/discovery/validators/:pubkey";
+pub(super) const DISCOVERY_OPERATORS_PATH: &str = "/registry/v1/discovery/operators";
+pub(super) const DISCOVERY_OPERATOR_PATH: &str = "/registry/v1/discovery/operators/:signer";
+pub(super) const DISCOVERY_LOOKAHEAD_PATH: &str = "/registry/v1/discovery/lookahead/:epoch";
 
 /// The registry API spec for validators.
 pub(super) trait ValidatorSpec {
     /// /registry/v1/validators/register
-    async fn register(&mut self, registration: Registration) -> Result<(), RegistryError>;
+    async fn register(&self, registration: Registration) -> Result<(), RegistryError>;
 
     /// /registry/v1/validators/deregister
-    async fn deregister(&mut self, deregistration: Deregistration) -> Result<(), RegistryError>;
+    async fn deregister(&self, deregistration: Deregistration) -> Result<(), RegistryError>;
 
     /// /registry/v1/validators/registrations
     async fn get_registrations(&self) -> Result<Vec<Registration>, RegistryError>;
@@ -58,3 +64,6 @@ pub(super) trait DiscoverySpec {
 
 /// The registry API specification.
 pub(super) trait ApiSpec: ValidatorSpec + DiscoverySpec {}
+
+#[derive(Debug, Error)]
+pub(crate) enum RegistryError {}

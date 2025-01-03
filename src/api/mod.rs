@@ -1,10 +1,13 @@
 //! Module `api` contains the API server for the registry. The API server is defined in
 //! [`spec::ApiSpec`];
 
-use std::net::SocketAddr;
+use std::{io, net::SocketAddr, sync::Arc};
 
 use actions::{Action, ActionStream};
-use tokio::{sync::mpsc, task::JoinHandle};
+use axum::{extract::State, response::IntoResponse, routing::get, Json, Router};
+use reqwest::StatusCode;
+use spec::{ValidatorSpec, VALIDATORS_REGISTER_PATH};
+use tokio::{net::TcpListener, sync::mpsc, task::JoinHandle};
 
 use crate::primitives::{
     registry::{Deregistration, Lookahead, Operator, Registration, RegistryEntry},
@@ -44,20 +47,38 @@ impl RegistryApi {
         (api, stream)
     }
 
-    pub(crate) fn spawn(self) -> JoinHandle<()> {
-        tokio::spawn(async move {})
+    /// Spawns the API server. Returns error if the server fails to bind to the listen address.
+    pub(crate) async fn spawn(self) -> Result<JoinHandle<()>, io::Error> {
+        let listen_addr = self.cfg.listen_addr;
+        let state = Arc::new(self);
+
+        let router =
+            Router::new().route(VALIDATORS_REGISTER_PATH, get(Self::register)).with_state(state);
+
+        let listener = TcpListener::bind(&listen_addr).await?;
+
+        Ok(tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        }))
+    }
+
+    // TODO: rest of these methods
+    async fn register(
+        State(api): State<Arc<RegistryApi>>,
+        Json(registration): Json<Registration>,
+    ) -> impl IntoResponse {
+        api.register(registration).await.unwrap();
+
+        StatusCode::OK
     }
 }
 
 impl spec::ValidatorSpec for RegistryApi {
-    async fn register(&mut self, registration: Registration) -> Result<(), spec::RegistryError> {
+    async fn register(&self, registration: Registration) -> Result<(), spec::RegistryError> {
         todo!()
     }
 
-    async fn deregister(
-        &mut self,
-        deregistration: Deregistration,
-    ) -> Result<(), spec::RegistryError> {
+    async fn deregister(&self, deregistration: Deregistration) -> Result<(), spec::RegistryError> {
         todo!()
     }
 
