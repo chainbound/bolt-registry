@@ -8,7 +8,7 @@ use crate::primitives::{
 };
 
 #[derive(Debug, Error)]
-pub(super) enum RegistryError {}
+pub(crate) enum RegistryError {}
 
 /// The registry API spec for validators.
 pub(super) trait ValidatorSpec {

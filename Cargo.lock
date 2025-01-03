@@ -858,6 +858,7 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "url",
 ]
 
