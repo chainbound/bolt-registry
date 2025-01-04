@@ -32,3 +32,5 @@ impl BlsPublicKey {
 }
 
 pub(crate) type BlsSignature = bls::Signature;
+
+pub(crate) type Digest = [u8; 32];

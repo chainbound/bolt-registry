@@ -11,9 +11,12 @@ use crate::primitives::{
     Address, BlsPublicKey,
 };
 
+// validator endpoints
 pub(super) const VALIDATORS_REGISTER_PATH: &str = "/registry/v1/validators/register";
 pub(super) const VALIDATORS_DEREGISTER_PATH: &str = "/registry/v1/validators/deregister";
 pub(super) const VALIDATORS_REGISTRATIONS_PATH: &str = "/registry/v1/validators/registrations";
+
+// discovery endpoints
 pub(super) const DISCOVERY_VALIDATORS_PATH: &str = "/registry/v1/discovery/validators";
 pub(super) const DISCOVERY_VALIDATOR_PATH: &str = "/registry/v1/discovery/validators/{pubkey}";
 pub(super) const DISCOVERY_OPERATORS_PATH: &str = "/registry/v1/discovery/operators";

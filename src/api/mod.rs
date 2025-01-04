@@ -163,6 +163,7 @@ impl RegistryApi {
 }
 
 impl spec::ValidatorSpec for RegistryApi {
+    #[tracing::instrument(skip(self))]
     async fn register(&self, registration: Registration) -> Result<(), spec::RegistryError> {
         let (tx, rx) = oneshot::channel();
 
@@ -172,6 +173,7 @@ impl spec::ValidatorSpec for RegistryApi {
         rx.await?
     }
 
+    #[tracing::instrument(skip(self))]
     async fn deregister(&self, deregistration: Deregistration) -> Result<(), spec::RegistryError> {
         let (tx, rx) = oneshot::channel();
 
@@ -181,6 +183,7 @@ impl spec::ValidatorSpec for RegistryApi {
         rx.await?
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_registrations(&self) -> Result<Vec<Registration>, spec::RegistryError> {
         let (tx, rx) = oneshot::channel();
 
@@ -192,6 +195,7 @@ impl spec::ValidatorSpec for RegistryApi {
 }
 
 impl spec::DiscoverySpec for RegistryApi {
+    #[tracing::instrument(skip(self))]
     async fn get_validators(&self) -> Result<Vec<RegistryEntry>, spec::RegistryError> {
         let (tx, rx) = oneshot::channel();
 
@@ -201,6 +205,7 @@ impl spec::DiscoverySpec for RegistryApi {
         rx.await?
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_validators_by_pubkeys(
         &self,
         pubkeys: Vec<BlsPublicKey>,
@@ -213,6 +218,7 @@ impl spec::DiscoverySpec for RegistryApi {
         rx.await?
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_validators_by_indices(
         &self,
         indices: Vec<usize>,
@@ -225,6 +231,7 @@ impl spec::DiscoverySpec for RegistryApi {
         rx.await?
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_validator_by_pubkey(
         &self,
         pubkey: crate::primitives::BlsPublicKey,
@@ -237,6 +244,7 @@ impl spec::DiscoverySpec for RegistryApi {
         rx.await?
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_operators(&self) -> Result<Vec<Operator>, spec::RegistryError> {
         let (tx, rx) = oneshot::channel();
 
@@ -246,6 +254,7 @@ impl spec::DiscoverySpec for RegistryApi {
         rx.await?
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_operator_by_signer(
         &self,
         signer: Address,
@@ -258,6 +267,7 @@ impl spec::DiscoverySpec for RegistryApi {
         rx.await?
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_lookahead(&self, epoch: u64) -> Result<Lookahead, spec::RegistryError> {
         let (tx, rx) = oneshot::channel();
 
@@ -265,5 +275,42 @@ impl spec::DiscoverySpec for RegistryApi {
         self.send_action(action).await?;
 
         rx.await?
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tokio_stream::StreamExt;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_register() {
+        let _ = tracing_subscriber::fmt().try_init();
+
+        let (api, mut stream) = RegistryApi::new(Default::default());
+
+        let registration = Registration {
+            validator_pubkeys: vec![BlsPublicKey::random()],
+            operator: Address::random(),
+            gas_limit: 10_000,
+            expiry: 0,
+            signatures: vec![],
+        };
+
+        let reg_clone = registration.clone();
+        tokio::spawn(async move {
+            let result = api.register(reg_clone).await;
+            assert!(result.is_ok());
+        });
+
+        let action = stream.next().await.unwrap();
+        match action {
+            Action::Register { registration: reg, response } => {
+                assert_eq!(registration.digest(), reg.digest());
+                response.send(Ok(())).unwrap();
+            }
+            _ => panic!("unexpected action"),
+        }
     }
 }
