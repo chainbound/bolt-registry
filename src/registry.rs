@@ -5,7 +5,10 @@ use crate::{
 
 /// The main registry object.
 pub(crate) struct Registry<Db> {
+    /// The database handle.
     db: Db,
+    /// Handle to the syncer. Before any reads, the implementation MUST block any reads & writes
+    /// until the syncer is done syncing the registry.
     sync: SyncHandle,
 }
 
