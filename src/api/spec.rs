@@ -1,5 +1,7 @@
 //! The API specification for the registry, and its errors. Contains 2 sub-specs: [`ValidatorSpec`]
 //! and [`DiscoverySpec`]. The [`ApiSpec`] trait combines both of these.
+
+use alloy::primitives::Address;
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -8,7 +10,7 @@ use tokio::sync::{mpsc::error::SendTimeoutError, oneshot::error::RecvError};
 use super::actions::Action;
 use crate::primitives::{
     registry::{Deregistration, Lookahead, Operator, Registration, RegistryEntry},
-    Address, BlsPublicKey,
+    BlsPublicKey,
 };
 
 // validator endpoints

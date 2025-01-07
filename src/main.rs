@@ -1,26 +1,50 @@
 //! Entrypoint.
+<<<<<<< HEAD
 use api::{actions::Action, ApiConfig, RegistryApi};
 use config::RegistryConfig;
 use db::DummyDb;
 use registry::Registry;
+=======
+
+>>>>>>> 6c5d96b (feat(db): added SQL db abstraction; minor nits; config file parsing)
 use tokio_stream::StreamExt;
 use tracing::error;
 
 mod api;
+<<<<<<< HEAD
 mod config;
+=======
+use api::{actions::Action, ApiConfig, RegistryApi};
+
+>>>>>>> 6c5d96b (feat(db): added SQL db abstraction; minor nits; config file parsing)
 mod db;
+use db::SQLDb;
+
 mod primitives;
+
 mod registry;
+use registry::Registry;
+
 mod sources;
+
 mod sync;
 
+mod cli;
+
 #[tokio::main]
-async fn main() {
+async fn main() -> eyre::Result<()> {
     tracing_subscriber::fmt::init();
 
+<<<<<<< HEAD
     let config = RegistryConfig { beacon_url: "http://remotebeast:44400".into() };
 
     let mut registry = Registry::new(config, DummyDb);
+=======
+    let config = cli::Opts::parse_config()?;
+
+    let db = SQLDb::new_pg(&config.db_url).await?;
+    let mut registry = Registry::new(db);
+>>>>>>> 6c5d96b (feat(db): added SQL db abstraction; minor nits; config file parsing)
 
     let (srv, mut actions) = RegistryApi::new(ApiConfig::default());
 
@@ -42,4 +66,6 @@ async fn main() {
             Action::GetOperators { response } => todo!(),
         }
     }
+
+    Ok(())
 }

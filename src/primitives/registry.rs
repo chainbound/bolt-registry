@@ -1,4 +1,4 @@
-use std::{collections::HashMap, hash::Hasher};
+use std::collections::HashMap;
 
 use alloy::primitives::{Address, U256};
 use serde::{Deserialize, Serialize};

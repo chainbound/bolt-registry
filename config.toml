@@ -1,4 +1,8 @@
+# The operator registry smart contract address
 operators_registry = "0x..."
+
+# Postgres database configuration
+db_url = "postgres://boltadmin:$PASSWORD@remotebeast:5412/bolt_registry"
 
 # Data sources
 # These data sources take precedence over the registry. Their values are canonical.
@@ -7,6 +11,3 @@ operators_registry = "0x..."
 [sources.lido]
 type = "kapi"
 base_url = "http://34.88.187.80:30303/v1/preconfs/lido-bolt/validators"
-
-# Postgres database configuration
-[db]
