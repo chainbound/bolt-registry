@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS validator_registrations (
     pubkey BYTEA PRIMARY KEY,             -- BLS public key of the validator
     signature BYTEA NOT NULL,             -- Signature of the registration
     expiry BIGINT NOT NULL,               -- Expiry timestamp of the registration
+    gas_limit BIGINT NOT NULL,            -- Gas limit for the validator
     operator BYTEA NOT NULL,              -- Operator address (foreign key)
     priority SMALLINT NOT NULL,           -- Priority level of this registration
     source source_enum NOT NULL,          -- Source of the registration data

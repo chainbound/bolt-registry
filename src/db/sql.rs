@@ -1,11 +1,19 @@
+use alloy::primitives::Address;
 use sqlx::Postgres;
 use tracing::info;
 
-use super::{Registration, RegistryDb};
+use super::{
+    types::{OperatorRow, ValidatorRegistrationRow},
+    BlsPublicKey, DbError, DbResult, Operator, Registration, RegistryDb,
+};
 
 /// Generic SQL database implementation, that supports all `SQLx` backends.
 #[derive(Debug)]
 pub(crate) struct SQLDb<Db: sqlx::Database> {
+    /// Inner connection pool handled by `SQLx`.
+    ///
+    /// Cloning `Pool` is cheap as it is simply a
+    /// reference-counted handle to the inner pool state.
     conn: sqlx::Pool<Db>,
 }
 
@@ -39,9 +47,9 @@ impl<Db: sqlx::Database> Clone for SQLDb<Db> {
 
 #[async_trait::async_trait]
 impl RegistryDb for SQLDb<Postgres> {
-    async fn register_validators(&self, registration: Registration) -> sqlx::Result<()> {
+    async fn register_validators(&self, registration: Registration) -> DbResult<()> {
         if registration.validator_pubkeys.len() != registration.signatures.len() {
-            return Err(sqlx::Error::Protocol("Mismatched number of pubkeys and signatures".into()));
+            return Err(DbError::Invariant("Mismatched number of pubkeys and signatures"));
         }
 
         let mut transaction = self.conn.begin().await?;
@@ -67,5 +75,55 @@ impl RegistryDb for SQLDb<Postgres> {
         transaction.commit().await?;
 
         Ok(())
+    }
+
+    async fn register_operator(&self, operator: Operator) -> DbResult<()> {
+        sqlx::query(
+            "
+            INSERT INTO operators (signer, rpc, protocol, source, collateral_tokens, collateral_amounts, last_update)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            ",
+        )
+        .bind(operator.signer.to_vec())
+        .bind(operator.rpc_endpoint.to_string())
+        .bind("none") // TODO: protocol
+        .bind("none") // TODO: source
+        // parse arrays as bytea[] with address bytes and little endian u256 bytes
+        .bind(operator.collateral_tokens.into_iter().map(|a| a.to_vec()).collect::<Vec<_>>())
+        .bind(operator.collateral_amounts.into_iter().map(|a| a.to_le_bytes_vec()).collect::<Vec<_>>())
+        .execute(&self.conn)
+        .await?;
+
+        Ok(())
+    }
+
+    async fn get_operator(&self, signer: Address) -> DbResult<Operator> {
+        let row: OperatorRow = sqlx::query_as(
+            "
+            SELECT signer, rpc, protocol, source, collateral_tokens, collateral_amounts, last_update
+            FROM operators
+            WHERE signer = $1
+            ",
+        )
+        .bind(signer.to_vec())
+        .fetch_one(&self.conn)
+        .await?;
+
+        row.try_into()
+    }
+
+    async fn get_validator_registration(&self, pubkey: BlsPublicKey) -> DbResult<Registration> {
+        let row: ValidatorRegistrationRow = sqlx::query_as(
+            "
+            SELECT pubkey, signature, expiry, gas_limit, operator, priority, source, last_update
+            FROM validator_registrations
+            WHERE pubkey = $1
+            ",
+        )
+        .bind(pubkey.serialize().to_vec())
+        .fetch_one(&self.conn)
+        .await?;
+
+        row.try_into()
     }
 }

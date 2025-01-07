@@ -1,9 +1,9 @@
-use derive_more::derive::{Deref, DerefMut};
+use derive_more::derive::{Deref, DerefMut, From};
 use serde::{Deserialize, Serialize};
 
 pub(crate) mod registry;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Deref, DerefMut)]
+#[derive(Debug, Clone, Serialize, Deserialize, Deref, DerefMut, From)]
 pub(crate) struct BlsPublicKey(bls::PublicKey);
 
 impl BlsPublicKey {
