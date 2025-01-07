@@ -5,7 +5,8 @@ edition = "2021"
 license = "MIT"
 # rust-version = "1.83"
 exclude = [".github/"]
-repository = "TODO"
+authors = ["Chainbound <admin@chainbound.io>"]
+repository = "https://github.com/chainbound/bolt-registry"
 
 # Explicitly set the resolver to version 2, which is the default for packages with edition >= 2021
 # https://doc.rust-lang.org/edition-guide/rust-2021/default-cargo-resolver.html
@@ -23,7 +24,7 @@ toml = "0.8.19"
 
 # observability
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.2.23", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt"] }
 
 # web
 reqwest = { version = "0.12", features = ["json", "stream"] }
@@ -43,6 +44,7 @@ sha2 = { version = "0.10", features = ["asm"] }
 # types
 url = { version = "2.5.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
+derive_more = "1.0.0"
 thiserror = "2.0"
 eyre = "0.6.12"
 

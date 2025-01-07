@@ -8,7 +8,7 @@ use registry::Registry;
 
 >>>>>>> 6c5d96b (feat(db): added SQL db abstraction; minor nits; config file parsing)
 use tokio_stream::StreamExt;
-use tracing::error;
+use tracing::{error, info};
 
 mod api;
 <<<<<<< HEAD
@@ -34,6 +34,7 @@ mod cli;
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     tracing_subscriber::fmt::init();
+    info!("Starting bolt registry server...");
 
 <<<<<<< HEAD
     let config = RegistryConfig { beacon_url: "http://remotebeast:44400".into() };
