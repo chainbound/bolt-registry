@@ -43,7 +43,7 @@ async fn main() -> eyre::Result<()> {
 =======
     let config = cli::Opts::parse_config()?;
 
-    let db = SQLDb::new_pg(&config.db_url).await?;
+    let db = SQLDb::new(&config.db_url).await?;
     let mut registry = Registry::new(db);
 >>>>>>> 6c5d96b (feat(db): added SQL db abstraction; minor nits; config file parsing)
 

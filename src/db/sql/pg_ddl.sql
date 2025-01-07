@@ -38,3 +38,18 @@ CREATE TABLE IF NOT EXISTS operators (
     last_update TIMESTAMP NOT NULL        -- Last time this record was updated
 );
 
+-- Add foreign key constraint if it doesn't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_operator_signer'
+        AND table_name = 'validator_registrations'
+    ) THEN
+        ALTER TABLE validator_registrations
+        ADD CONSTRAINT fk_operator_signer
+        FOREIGN KEY (operator) 
+        REFERENCES operators(signer);
+    END IF;
+END $$;
