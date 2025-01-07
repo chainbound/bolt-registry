@@ -4,6 +4,7 @@ use tokio::{sync::watch, task::JoinHandle};
 
 use crate::db::RegistryDb;
 
+mod chain;
 mod head_tracker;
 
 enum SyncState {
