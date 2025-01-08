@@ -21,11 +21,12 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.2.23", features = ["env-filter"] }
 
 # web
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
 axum = "0.8.1"
 
 # ethereum
 alloy = { version = "0.9.1", features = ["consensus", "rpc-types", "reqwest"] }
+beacon-client = { package = "beacon-api-client", git = "https://github.com/ralexstokes/ethereum-consensus" }
 
 # crypto
 bls = { git = "https://github.com/sigp/lighthouse", tag = "v6.0.1", features = [

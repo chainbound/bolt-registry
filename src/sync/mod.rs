@@ -1,10 +1,22 @@
 //! Module `sync` contains functionality for syncing the registry with the chain, and other external
 //! data providers.
+use chain::{EpochTransitionStream, EventsClient};
+use reqwest::IntoUrl;
+use thiserror::Error;
 use tokio::{sync::watch, task::JoinHandle};
+use tokio_stream::StreamExt;
+use tracing::info;
 
 use crate::db::RegistryDb;
 
+mod chain;
 mod head_tracker;
+
+#[derive(Debug, Error)]
+pub(crate) enum SyncError {
+    #[error(transparent)]
+    Beacon(#[from] beacon_client::Error),
+}
 
 enum SyncState {
     /// The syncer is currently syncing the registry.
@@ -39,22 +51,39 @@ impl SyncHandle {
 pub(crate) struct Syncer<Db> {
     db: Db,
     state: watch::Sender<SyncState>,
+    events_client: EventsClient,
 }
 
 impl<Db: RegistryDb> Syncer<Db> {
     /// Creates a new syncer with the given database.
-    pub(crate) fn new(db: Db) -> (Self, SyncHandle) {
+    pub(crate) fn new(beacon_url: impl IntoUrl, db: Db) -> (Self, SyncHandle) {
         let (state_tx, state_rx) = watch::channel(SyncState::Synced);
-        let syncer = Self { db, state: state_tx };
         let handle = SyncHandle { state: state_rx };
+
+        let events_client = EventsClient::new(beacon_url);
+
+        let syncer = Self { db, state: state_tx, events_client };
 
         (syncer, handle)
     }
 
     /// Spawns the [`Syncer`] actor task.
-    pub(crate) fn spawn(self) -> JoinHandle<()> {
+    pub(crate) fn spawn(self) -> JoinHandle<Result<(), SyncError>> {
         tokio::spawn(async move {
-            // TODO: handle async logic
+            let pa_stream = self.events_client.subscribe_payload_attributes().await?;
+
+            let mut epoch_stream = EpochTransitionStream::new(pa_stream);
+
+            while let Some(transition) = epoch_stream.next().await {
+                info!(
+                    epoch = transition.epoch,
+                    slot = transition.slot,
+                    block_number = transition.block_number,
+                    "New epoch transition"
+                );
+            }
+
+            Ok(())
         })
     }
 }
