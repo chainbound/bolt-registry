@@ -4,7 +4,7 @@ use alloy::primitives::{Address, U256};
 
 use crate::primitives::{BlsPublicKey, BlsSignature};
 
-use super::{DbError, Operator, Registration};
+use super::{DbError, Operator, Registration, RegistryEntry};
 
 #[derive(sqlx::FromRow, Debug)]
 pub(crate) struct OperatorRow {
@@ -52,6 +52,7 @@ pub(crate) struct ValidatorRegistrationRow {
     pub priority: i32,                      // SMALLINT
     pub source: String,                     // SOURCE_ENUM
     pub last_update: chrono::NaiveDateTime, // TIMESTAMP
+    pub rpc: Option<String>,                // TEXT (from operators table)
 }
 
 impl TryFrom<ValidatorRegistrationRow> for Registration {
@@ -59,11 +60,24 @@ impl TryFrom<ValidatorRegistrationRow> for Registration {
 
     fn try_from(value: ValidatorRegistrationRow) -> Result<Self, Self::Error> {
         Ok(Self {
-            validator_pubkeys: vec![parse_pubkey(&value.pubkey)?],
-            signatures: vec![parse_signature(&value.signature)?],
+            validator_pubkey: parse_pubkey(&value.pubkey)?,
+            signature: parse_signature(&value.signature)?,
             operator: parse_address(&value.operator)?,
             gas_limit: value.gas_limit as u64,
             expiry: value.expiry as u64,
+        })
+    }
+}
+
+impl TryFrom<ValidatorRegistrationRow> for RegistryEntry {
+    type Error = DbError;
+
+    fn try_from(value: ValidatorRegistrationRow) -> Result<Self, Self::Error> {
+        Ok(Self {
+            validator_pubkey: parse_pubkey(&value.pubkey)?,
+            operator: parse_address(&value.operator)?,
+            gas_limit: value.gas_limit as u64,
+            rpc_endpoint: value.rpc.ok_or(DbError::MissingField("operator.rpc"))?.parse()?,
         })
     }
 }

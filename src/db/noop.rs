@@ -1,12 +1,20 @@
 use alloy::primitives::Address;
 
-use super::{BlsPublicKey, DbResult, Operator, Registration, RegistryDb};
+use crate::primitives::BlsSignature;
+
+use super::{
+    BlsPublicKey, DbResult, Deregistration, Operator, Registration, RegistryDb, RegistryEntry,
+};
 
 #[derive(Debug, Clone)]
 pub(crate) struct NoOpDb;
 
 impl RegistryDb for NoOpDb {
-    async fn register_validators(&self, _registration: Registration) -> DbResult<()> {
+    async fn register_validators(&self, _registration: &[Registration]) -> DbResult<()> {
+        Ok(())
+    }
+
+    async fn deregister_validators(&self, _deregistration: &[Deregistration]) -> DbResult<()> {
         Ok(())
     }
 
@@ -23,13 +31,28 @@ impl RegistryDb for NoOpDb {
         })
     }
 
-    async fn get_validator_registration(&self, pubkey: BlsPublicKey) -> DbResult<Registration> {
-        Ok(Registration {
-            validator_pubkeys: vec![pubkey],
-            operator: Address::default(),
+    async fn get_registrations(
+        &self,
+        pubkeys: Option<&[BlsPublicKey]>,
+    ) -> DbResult<Vec<Registration>> {
+        Ok(vec![Registration {
+            validator_pubkey: pubkeys.unwrap().first().unwrap().clone(),
+            operator: Address::random(),
             gas_limit: 0,
             expiry: 0,
-            signatures: vec![],
-        })
+            signature: BlsSignature::empty(),
+        }])
+    }
+
+    async fn get_validators(
+        &self,
+        pubkeys: Option<&[BlsPublicKey]>,
+    ) -> DbResult<Vec<RegistryEntry>> {
+        Ok(vec![RegistryEntry {
+            validator_pubkey: pubkeys.unwrap().first().unwrap().clone(),
+            operator: Address::random(),
+            gas_limit: 0,
+            rpc_endpoint: "https://grugbrain.dev".parse()?,
+        }])
     }
 }

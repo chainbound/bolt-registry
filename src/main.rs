@@ -4,7 +4,7 @@ use tokio_stream::StreamExt;
 use tracing::{error, info};
 
 mod api;
-use api::{actions::Action, ApiConfig, RegistryApi};
+use api::{actions::Action, spec::RegistryError, ApiConfig, RegistryApi};
 
 mod db;
 use db::SQLDb;
@@ -43,15 +43,44 @@ async fn main() -> eyre::Result<()> {
                 let res = registry.register_validators(registration).await;
                 let _ = response.send(res);
             }
-            Action::Deregister { deregistration, response } => todo!(),
-            Action::GetRegistrations { response } => todo!(),
-            Action::GetValidators { response } => todo!(),
-            Action::GetValidatorsByPubkeys { pubkeys, response } => todo!(),
-            Action::GetValidatorsByIndices { indices, response } => todo!(),
-            Action::GetLookahead { epoch, response } => todo!(),
-            Action::GetOperator { signer, response } => todo!(),
-            Action::GetValidatorByPubkey { pubkey, response } => todo!(),
-            Action::GetOperators { response } => todo!(),
+            Action::Deregister { deregistration, response } => {
+                let res = registry.deregister_validators(deregistration).await;
+                let _ = response.send(res);
+            }
+            Action::GetRegistrations { response } => {
+                let res = registry.get_registrations(None).await;
+                let _ = response.send(res);
+            }
+            Action::GetValidators { response } => {
+                let res = registry.get_validators(None).await;
+                let _ = response.send(res);
+            }
+            Action::GetValidatorsByPubkeys { pubkeys, response } => {
+                let res = registry.get_validators(Some(&pubkeys)).await;
+                let _ = response.send(res);
+            }
+            Action::GetValidatorsByIndices { indices, response } => {
+                // TODO: fetch pubkeys from indices from beacon node
+                // let res = registry.get_validators_by_indices(indices).await;
+                // let _ = response.send(res);
+            }
+            Action::GetValidatorByPubkey { pubkey, response } => {
+                let res = registry.get_validators(Some(&[pubkey])).await;
+                let first_validator_res = res.map(|mut v| v.pop()).transpose();
+                let _ = response.send(first_validator_res.unwrap_or(Err(RegistryError::NotFound)));
+            }
+            Action::GetOperator { signer, response } => {
+                // let res = registry.get_operator(signer).await;
+                // let _ = response.send(res);
+            }
+            Action::GetOperators { response } => {
+                // let res = registry.get_operators().await;
+                // let _ = response.send(res);
+            }
+            Action::GetLookahead { epoch, response } => {
+                // let res = registry.get_lookahead(epoch).await;
+                // let _ = response.send(res);
+            }
         }
     }
 

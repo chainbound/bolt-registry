@@ -1,5 +1,5 @@
 //! Module `api` contains the API server for the registry. The API server is defined in
-//! [`spec::ApiSpec`];
+//! [`spec::ValidatorSpec`] and [`spec::DiscoverySpec`], and is implemented by [`RegistryApi`].
 
 use std::{io, net::SocketAddr, sync::Arc, time::Duration};
 
@@ -22,7 +22,9 @@ use tokio::{
 use tracing::error;
 
 use crate::primitives::{
-    registry::{Deregistration, Lookahead, Operator, Registration, RegistryEntry},
+    registry::{
+        DeregistrationBatch, Lookahead, Operator, Registration, RegistrationBatch, RegistryEntry,
+    },
     BlsPublicKey,
 };
 
@@ -110,14 +112,14 @@ impl RegistryApi {
 
     async fn register(
         State(api): State<Arc<Self>>,
-        Json(registration): Json<Registration>,
+        Json(registration): Json<RegistrationBatch>,
     ) -> impl IntoResponse {
         api.register(registration).await
     }
 
     async fn deregister(
         State(api): State<Arc<Self>>,
-        Json(deregistration): Json<Deregistration>,
+        Json(deregistration): Json<DeregistrationBatch>,
     ) -> impl IntoResponse {
         api.deregister(deregistration).await
     }
@@ -169,7 +171,7 @@ impl RegistryApi {
 
 impl spec::ValidatorSpec for RegistryApi {
     #[tracing::instrument(skip(self))]
-    async fn register(&self, registration: Registration) -> Result<(), spec::RegistryError> {
+    async fn register(&self, registration: RegistrationBatch) -> Result<(), spec::RegistryError> {
         let (tx, rx) = oneshot::channel();
 
         let action = Action::Register { registration, response: tx };
@@ -179,7 +181,10 @@ impl spec::ValidatorSpec for RegistryApi {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn deregister(&self, deregistration: Deregistration) -> Result<(), spec::RegistryError> {
+    async fn deregister(
+        &self,
+        deregistration: DeregistrationBatch,
+    ) -> Result<(), spec::RegistryError> {
         let (tx, rx) = oneshot::channel();
 
         let action = Action::Deregister { deregistration, response: tx };
@@ -287,6 +292,8 @@ impl spec::DiscoverySpec for RegistryApi {
 mod tests {
     use tokio_stream::StreamExt;
 
+    use crate::primitives::registry::RegistrationBatch;
+
     use super::*;
 
     #[tokio::test]
@@ -295,7 +302,7 @@ mod tests {
 
         let (api, mut stream) = RegistryApi::new(Default::default());
 
-        let registration = Registration {
+        let registration = RegistrationBatch {
             validator_pubkeys: vec![BlsPublicKey::random()],
             operator: Address::random(),
             gas_limit: 10_000,

@@ -7,9 +7,9 @@ use alloy::primitives::Address;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::Stream;
 
-use super::spec;
+use super::{spec, DeregistrationBatch, RegistrationBatch};
 use crate::primitives::{
-    registry::{Deregistration, Lookahead, Operator, Registration, RegistryEntry},
+    registry::{Lookahead, Operator, Registration, RegistryEntry},
     BlsPublicKey,
 };
 
@@ -17,11 +17,11 @@ use crate::primitives::{
 /// Actions are a mix of commands and queries.
 pub(crate) enum Action {
     Register {
-        registration: Registration,
+        registration: RegistrationBatch,
         response: oneshot::Sender<Result<(), spec::RegistryError>>,
     },
     Deregister {
-        deregistration: Deregistration,
+        deregistration: DeregistrationBatch,
         response: oneshot::Sender<Result<(), spec::RegistryError>>,
     },
     GetRegistrations {

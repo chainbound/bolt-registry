@@ -4,7 +4,10 @@ use crate::{
     api::spec::RegistryError,
     cli::Config,
     db::RegistryDb,
-    primitives::registry::Registration,
+    primitives::{
+        registry::{DeregistrationBatch, Registration, RegistrationBatch, RegistryEntry},
+        BlsPublicKey,
+    },
     sync::{SyncHandle, Syncer},
 };
 
@@ -27,15 +30,46 @@ impl<Db: RegistryDb> Registry<Db> {
     }
 
     pub(crate) async fn register_validators(
-        &self,
-        registration: Registration,
+        &mut self,
+        registration: RegistrationBatch,
     ) -> Result<(), RegistryError> {
         let count = registration.validator_pubkeys.len();
         let operator = registration.operator;
 
-        self.db.register_validators(registration).await?;
-        info!(%count, %operator, "Validators registered successfully");
+        self.sync.wait_for_sync().await;
+        self.db.register_validators(&registration.into_items()).await?;
 
+        info!(%count, %operator, "Validators registered successfully");
         Ok(())
+    }
+
+    pub(crate) async fn deregister_validators(
+        &mut self,
+        deregistration: DeregistrationBatch,
+    ) -> Result<(), RegistryError> {
+        let count = deregistration.validator_pubkeys.len();
+        let operator = deregistration.operator;
+
+        self.sync.wait_for_sync().await;
+        self.db.deregister_validators(&deregistration.into_items()).await?;
+
+        info!(%count, %operator, "Validators deregistered successfully");
+        Ok(())
+    }
+
+    pub(crate) async fn get_registrations(
+        &mut self,
+        pubkeys: Option<&[BlsPublicKey]>,
+    ) -> Result<Vec<Registration>, RegistryError> {
+        self.sync.wait_for_sync().await;
+        Ok(self.db.get_registrations(pubkeys).await?)
+    }
+
+    pub(crate) async fn get_validators(
+        &mut self,
+        pubkeys: Option<&[BlsPublicKey]>,
+    ) -> Result<Vec<RegistryEntry>, RegistryError> {
+        self.sync.wait_for_sync().await;
+        Ok(self.db.get_validators(pubkeys).await?)
     }
 }

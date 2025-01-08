@@ -5,7 +5,7 @@ use std::array::TryFromSliceError;
 use alloy::primitives::Address;
 
 use crate::primitives::{
-    registry::{Operator, Registration},
+    registry::{Deregistration, Operator, Registration, RegistryEntry},
     BlsPublicKey,
 };
 
@@ -35,14 +35,17 @@ pub(crate) enum DbError {
     ParseBLSKey(bls::Error),
     #[error("Failed to parse integer: {0}")]
     ParseUint(&'static str),
-    #[error("Database invariant violation: {0}")]
-    Invariant(&'static str),
+    #[error("Missing field from query result: {0}")]
+    MissingField(&'static str),
 }
 
 /// Registry database trait.
 pub(crate) trait RegistryDb: Clone {
     /// Register validators in the database.
-    async fn register_validators(&self, registration: Registration) -> DbResult<()>;
+    async fn register_validators(&self, registrations: &[Registration]) -> DbResult<()>;
+
+    /// Deregister validators in the database.
+    async fn deregister_validators(&self, deregistrations: &[Deregistration]) -> DbResult<()>;
 
     /// Register an operator in the database.
     async fn register_operator(&self, operator: Operator) -> DbResult<()>;
@@ -50,6 +53,19 @@ pub(crate) trait RegistryDb: Clone {
     /// Get an operator from the database.
     async fn get_operator(&self, signer: Address) -> DbResult<Operator>;
 
-    /// Get a validator registration from the database.
-    async fn get_validator_registration(&self, pubkey: BlsPublicKey) -> DbResult<Registration>;
+    /// Get a batch of registrations from the database, by their public keys.
+    ///
+    /// If no public keys are provided, return all registrations in the registry.
+    async fn get_registrations(
+        &self,
+        pubkeys: Option<&[BlsPublicKey]>,
+    ) -> DbResult<Vec<Registration>>;
+
+    /// Get a batch of validators from the database, by their public keys.
+    ///
+    /// If no public keys are provided, return all validators in the registry.
+    async fn get_validators(
+        &self,
+        pubkeys: Option<&[BlsPublicKey]>,
+    ) -> DbResult<Vec<RegistryEntry>>;
 }
