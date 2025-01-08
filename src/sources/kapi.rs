@@ -2,7 +2,7 @@
 //! <https://github.com/lidofinance/lido-keys-api/tree/develop>
 
 use alloy::primitives::Address;
-use reqwest::RequestBuilder;
+use reqwest::{IntoUrl, RequestBuilder};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -29,8 +29,11 @@ struct ValidatorEntry {
 }
 
 impl KeysApi {
-    pub(crate) fn new(base_url: Url) -> Self {
-        Self { client: reqwest::Client::new(), url: base_url }
+    pub(crate) fn new(base_url: impl IntoUrl) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            url: base_url.into_url().expect("failed to parse URL"),
+        }
     }
 
     /// Fetches validators by `pubkeys` from the API.
@@ -72,16 +75,16 @@ mod tests {
     #[test]
     fn test_keys_api() -> eyre::Result<()> {
         // Url displays a trailing backslash, so need to add that here
-        let url = Url::parse("http://34.88.187.80:30303/")?;
-        let keys_api = KeysApi::new(url.clone());
+        let url = "http://34.88.187.80:30303/";
+        let keys_api = KeysApi::new(url);
 
-        assert_eq!(keys_api.url, url);
+        assert_eq!(keys_api.url.as_str(), url);
         Ok(())
     }
 
     #[test]
     fn test_get_validators_request() -> eyre::Result<()> {
-        let url = Url::parse("http://34.88.187.80:30303/")?;
+        let url = "http://34.88.187.80:30303/";
         let keys_api = KeysApi::new(url);
 
         let pubkeys = vec![BlsPublicKey::random(), BlsPublicKey::random(), BlsPublicKey::random()];
