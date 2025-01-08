@@ -28,7 +28,7 @@ contract OperatorsRegistry is OwnableUpgradeable, UUPSUpgradeable {
     OperatorMap private OPERATORS;
 
     /// @notice The set of restaking middleware contract addresses
-    AddressSet private RESTAKING_MIDDLEWARES;
+    EnumerableSet.AddressSet private RESTAKING_MIDDLEWARES;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -70,7 +70,7 @@ contract OperatorsRegistry is OwnableUpgradeable, UUPSUpgradeable {
 
         require(signer != address(0), "Invalid operator address");
         require(bytes(rpcEndpoint).length > 0, "Invalid rpc endpoint");
-        require(restakingMiddlewares.contains(restakingMiddleware), "Invalid restaking middleware");
+        require(RESTAKING_MIDDLEWARES.contains(restakingMiddleware), "Invalid restaking middleware");
 
         OPERATORS._keys.add(key);
         OPERATORS._values[key] = Operator(signer, rpcEndpoint, restakingMiddleware);
