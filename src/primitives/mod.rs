@@ -1,28 +1,10 @@
-use std::ops::{Deref, DerefMut};
-
+use derive_more::derive::{Deref, DerefMut, From};
 use serde::{Deserialize, Serialize};
-
-// re-export primitives from alloy
-pub(crate) use alloy::primitives::*;
 
 pub(crate) mod registry;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Deref, DerefMut, From)]
 pub(crate) struct BlsPublicKey(bls::PublicKey);
-
-impl Deref for BlsPublicKey {
-    type Target = bls::PublicKey;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for BlsPublicKey {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 impl BlsPublicKey {
     #[cfg(test)]

@@ -1,26 +1,35 @@
 //! Entrypoint.
-use api::{actions::Action, ApiConfig, RegistryApi};
-use config::RegistryConfig;
-use db::DummyDb;
-use registry::Registry;
+
 use tokio_stream::StreamExt;
-use tracing::error;
+use tracing::{error, info};
 
 mod api;
-mod config;
+use api::{actions::Action, ApiConfig, RegistryApi};
+
 mod db;
+use db::SQLDb;
+
 mod primitives;
+
 mod registry;
+use registry::Registry;
+
 mod sources;
+
 mod sync;
 
+mod cli;
+
 #[tokio::main]
-async fn main() {
+async fn main() -> eyre::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let config = RegistryConfig { beacon_url: "http://remotebeast:44400".into() };
+    info!("Starting bolt registry server...");
 
-    let mut registry = Registry::new(config, DummyDb);
+    let config = cli::Opts::parse_config()?;
+
+    let db = SQLDb::new(&config.db_url).await?;
+    let mut registry = Registry::new(config, db);
 
     let (srv, mut actions) = RegistryApi::new(ApiConfig::default());
 
@@ -42,4 +51,6 @@ async fn main() {
             Action::GetOperators { response } => todo!(),
         }
     }
+
+    Ok(())
 }

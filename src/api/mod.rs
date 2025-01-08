@@ -1,6 +1,9 @@
 //! Module `api` contains the API server for the registry. The API server is defined in
 //! [`spec::ApiSpec`];
 
+use std::{io, net::SocketAddr, sync::Arc, time::Duration};
+
+use alloy::primitives::Address;
 use axum::{
     extract::{Path, Query, State},
     response::IntoResponse,
@@ -8,7 +11,6 @@ use axum::{
     Json, Router,
 };
 use serde::Deserialize;
-use std::{io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
     sync::{
@@ -17,21 +19,22 @@ use tokio::{
     },
     task::JoinHandle,
 };
+use tracing::error;
 
 use crate::primitives::{
     registry::{Deregistration, Lookahead, Operator, Registration, RegistryEntry},
-    Address, BlsPublicKey,
+    BlsPublicKey,
 };
+
+pub(crate) mod actions;
 use actions::{Action, ActionStream};
+
+mod spec;
 use spec::{
     DiscoverySpec, ValidatorSpec, DISCOVERY_LOOKAHEAD_PATH, DISCOVERY_OPERATORS_PATH,
     DISCOVERY_OPERATOR_PATH, DISCOVERY_VALIDATORS_PATH, DISCOVERY_VALIDATOR_PATH,
     VALIDATORS_DEREGISTER_PATH, VALIDATORS_REGISTER_PATH, VALIDATORS_REGISTRATIONS_PATH,
 };
-
-pub(crate) mod actions;
-
-mod spec;
 
 /// The registry API server, implementing the [`spec::ApiSpec`] trait.
 pub(crate) struct RegistryApi {
@@ -99,7 +102,9 @@ impl RegistryApi {
         let listener = TcpListener::bind(&listen_addr).await?;
 
         Ok(tokio::spawn(async move {
-            axum::serve(listener, router).await.unwrap();
+            if let Err(err) = axum::serve(listener, router).await {
+                error!("API server crashed: {}", err);
+            }
         }))
     }
 

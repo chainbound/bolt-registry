@@ -2,13 +2,15 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+
+use alloy::primitives::Address;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::Stream;
 
 use super::spec;
 use crate::primitives::{
     registry::{Deregistration, Lookahead, Operator, Registration, RegistryEntry},
-    Address, BlsPublicKey,
+    BlsPublicKey,
 };
 
 /// An action to be executed by upstream services.

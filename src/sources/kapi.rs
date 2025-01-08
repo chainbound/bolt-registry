@@ -2,7 +2,7 @@
 //! <https://github.com/lidofinance/lido-keys-api/tree/develop>
 
 use alloy::primitives::Address;
-use reqwest::RequestBuilder;
+use reqwest::{IntoUrl, RequestBuilder};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -29,8 +29,11 @@ struct ValidatorEntry {
 }
 
 impl KeysApi {
-    pub(crate) fn new(base_url: impl AsRef<str>) -> Self {
-        Self { client: reqwest::Client::new(), url: Url::parse(base_url.as_ref()).unwrap() }
+    pub(crate) fn new(base_url: impl IntoUrl) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            url: base_url.into_url().expect("failed to parse URL"),
+        }
     }
 
     /// Fetches validators by `pubkeys` from the API.
@@ -60,6 +63,7 @@ impl KeysApi {
         let url = self.url.join(VALIDATORS_PATH).unwrap();
         let pubkeys_query =
             pubkeys.iter().map(|pubkey| pubkey.to_string()).collect::<Vec<_>>().join(",");
+
         self.client.get(url).query(&[("pubkeys", pubkeys_query)])
     }
 }
@@ -69,21 +73,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_keys_api() {
+    fn test_keys_api() -> eyre::Result<()> {
         // Url displays a trailing backslash, so need to add that here
         let url = "http://34.88.187.80:30303/";
         let keys_api = KeysApi::new(url);
 
         assert_eq!(keys_api.url.as_str(), url);
-
-        let url = url.to_string();
-        let keys_api = KeysApi::new(url.clone());
-
-        assert_eq!(keys_api.url.as_str(), url.as_str());
+        Ok(())
     }
 
     #[test]
-    fn test_get_validators_request() {
+    fn test_get_validators_request() -> eyre::Result<()> {
         let url = "http://34.88.187.80:30303/";
         let keys_api = KeysApi::new(url);
 
@@ -91,6 +91,8 @@ mod tests {
 
         let request = keys_api.get_validators_request(pubkeys);
 
-        println!("{}", request.build().unwrap().url())
+        println!("{}", request.build()?.url());
+
+        Ok(())
     }
 }

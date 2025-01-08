@@ -5,7 +5,8 @@ edition = "2021"
 license = "MIT"
 # rust-version = "1.83"
 exclude = [".github/"]
-repository = "TODO"
+authors = ["Chainbound <dev@chainbound.io>"]
+repository = "https://github.com/chainbound/bolt-registry"
 
 # Explicitly set the resolver to version 2, which is the default for packages with edition >= 2021
 # https://doc.rust-lang.org/edition-guide/rust-2021/default-cargo-resolver.html
@@ -16,28 +17,37 @@ resolver = "2"
 tokio = { version = "1.42", features = ["rt-multi-thread", "sync"] }
 tokio-stream = "0.1.17"
 
+# cli
+clap = { version = "4.5.4", features = ["derive", "env"] }
+figment = { version = "0.10.19", features = ["env", "toml"] }
+
 # observability
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.2.23", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt"] }
 
 # web
 reqwest = { version = "0.12", features = ["json", "stream"] }
 axum = "0.8.1"
+
+# db
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono"] }
 
 # ethereum
 alloy = { version = "0.9.1", features = ["consensus", "rpc-types", "reqwest"] }
 beacon-client = { package = "beacon-api-client", git = "https://github.com/ralexstokes/ethereum-consensus" }
 
 # crypto
-bls = { git = "https://github.com/sigp/lighthouse", tag = "v6.0.1", features = [
-    "supranational",
-] }
+bls = { git = "https://github.com/sigp/lighthouse", tag = "v6.0.1", features = ["supranational"] }
 sha2 = { version = "0.10", features = ["asm"] }
 
 # types
 url = { version = "2.5.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
+derive_more = "1.0.0"
 thiserror = "2.0"
+eyre = "0.6.12"
+chrono = "0.4.39"
+dotenvy = "0.15.7"
 
 [lints]
 rust.missing_debug_implementations = "warn"

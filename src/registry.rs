@@ -1,5 +1,5 @@
 use crate::{
-    config::RegistryConfig,
+    cli::Config,
     db::RegistryDb,
     sync::{SyncHandle, Syncer},
 };
@@ -13,8 +13,8 @@ pub(crate) struct Registry<Db> {
     sync: SyncHandle,
 }
 
-impl<Db: RegistryDb + Clone> Registry<Db> {
-    pub(crate) fn new(config: RegistryConfig, db: Db) -> Self {
+impl<Db: RegistryDb> Registry<Db> {
+    pub(crate) fn new(config: Config, db: Db) -> Self {
         let (syncer, handle) = Syncer::new(&config.beacon_url, db.clone());
 
         let _sync_task = syncer.spawn();
