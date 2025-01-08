@@ -1,11 +1,13 @@
 //! Entrypoint.
 use api::{actions::Action, ApiConfig, RegistryApi};
+use config::RegistryConfig;
 use db::DummyDb;
 use registry::Registry;
 use tokio_stream::StreamExt;
 use tracing::error;
 
 mod api;
+mod config;
 mod db;
 mod primitives;
 mod registry;
@@ -16,7 +18,9 @@ mod sync;
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let mut registry = Registry::new(DummyDb);
+    let config = RegistryConfig { beacon_url: "http://remotebeast:44400".into() };
+
+    let mut registry = Registry::new(config, DummyDb);
 
     let (srv, mut actions) = RegistryApi::new(ApiConfig::default());
 
