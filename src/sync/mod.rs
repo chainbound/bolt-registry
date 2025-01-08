@@ -1,13 +1,14 @@
 //! Module `sync` contains functionality for syncing the registry with the chain, and other external
 //! data providers.
+use beacon_client::ProposerDuty;
 use chain::{BeaconClient, EpochTransition, EpochTransitionStream};
 use reqwest::IntoUrl;
 use thiserror::Error;
 use tokio::{sync::watch, task::JoinHandle};
 use tokio_stream::StreamExt;
-use tracing::info;
+use tracing::{error, info};
 
-use crate::db::RegistryDb;
+use crate::{db::RegistryDb, sources::kapi::KeysApi};
 
 mod chain;
 
@@ -50,21 +51,35 @@ impl SyncHandle {
 pub(crate) struct Syncer<Db> {
     db: Db,
     state: watch::Sender<SyncState>,
-    events_client: BeaconClient,
+    beacon_client: BeaconClient,
+
+    /// Lido keys API.
+    keys_api: KeysApi,
+
+    /// The last known block number. Whenever a new epoch transition occurs, sync contract events
+    /// from this block number to the new block number.
+    last_block_number: u64,
 }
 
 impl<Db> Syncer<Db>
 where
     Db: RegistryDb + Send + 'static,
 {
-    /// Creates a new syncer with the given database.
-    pub(crate) fn new(beacon_url: impl IntoUrl, db: Db) -> (Self, SyncHandle) {
+    /// Creates a new syncer with the given beacon and keys API URLs, and the database handle.
+    pub(crate) fn new(
+        beacon_url: impl IntoUrl,
+        keys_api: impl IntoUrl,
+        db: Db,
+    ) -> (Self, SyncHandle) {
         let (state_tx, state_rx) = watch::channel(SyncState::Synced);
         let handle = SyncHandle { state: state_rx };
 
-        let events_client = BeaconClient::new(beacon_url);
+        let beacon_client = BeaconClient::new(beacon_url);
+        let kapi = KeysApi::new(keys_api);
 
-        let syncer = Self { db, state: state_tx, events_client };
+        // TODO: read the last block number from the database and use as checkpoint for backfill
+        let syncer =
+            Self { db, state: state_tx, beacon_client, keys_api: kapi, last_block_number: 0 };
 
         (syncer, handle)
     }
@@ -72,20 +87,25 @@ where
     /// Spawns the [`Syncer`] actor task.
     pub(crate) fn spawn(mut self) -> JoinHandle<Result<(), SyncError>> {
         tokio::spawn(async move {
-            let pa_stream = self.events_client.subscribe_payload_attributes().await?;
+            let pa_stream = self.beacon_client.subscribe_payload_attributes().await?;
 
             let mut epoch_stream = EpochTransitionStream::new(pa_stream);
 
             while let Some(transition) = epoch_stream.next().await {
-                self.on_transition(transition);
+                self.on_transition(transition).await;
             }
 
             Ok(())
         })
     }
 
+    /// Backfills the registry from the last known block number to the current block number.
+    async fn backfill(&mut self) {
+        todo!()
+    }
+
     /// Handles an epoch transition event.
-    fn on_transition(&mut self, transition: EpochTransition) {
+    async fn on_transition(&mut self, transition: EpochTransition) {
         info!(
             epoch = transition.epoch,
             slot = transition.slot,
@@ -95,5 +115,27 @@ where
 
         // Update to syncing state
         let _ = self.state.send(SyncState::Syncing);
+
+        self.sync_contract_events(transition.block_number).await;
+
+        // TODO: handle failure here (currently infinitely retried inside beacon_client)
+        let Ok(lookahead) = self.beacon_client.get_lookahead(transition.epoch, true).await else {
+            error!("Failed to get lookahead for epoch {}", transition.epoch);
+            return;
+        };
+
+        self.sync_lookahead(lookahead).await;
+    }
+
+    /// Syncs contract events from the last known block number to the given block number.
+    async fn sync_contract_events(&mut self, block_number: u64) {
+        // 1. Get contract logs from self.last_block_number to block_number
+        // 2. Sync to database
+        // 3. Update last_block_number = block_number
+        todo!()
+    }
+
+    async fn sync_lookahead(&mut self, lookahead: Vec<ProposerDuty>) {
+        todo!()
     }
 }

@@ -9,6 +9,7 @@ use beacon_client::{
 };
 use reqwest::IntoUrl;
 use tokio_stream::{Stream, StreamExt};
+use tracing::warn;
 
 /// A client that can subscribe to SSE events.
 pub(super) struct BeaconClient {
@@ -34,10 +35,21 @@ impl BeaconClient {
     /// 3. At a 4 seconds into a slot, without a new head.
     ///
     /// Note that multiple payload attribute events can be emitted for the same `proposal_slot`.
+    ///
+    /// # Retries
+    /// This method will retry indefinitely in case of a failure.
     pub(super) async fn subscribe_payload_attributes(
         &self,
     ) -> Result<impl Stream<Item = PayloadAttribute> + Send + Unpin, Error> {
-        let events = self.client.get_events::<PayloadAttributesTopic>().await?;
+        let events = loop {
+            match self.client.get_events::<PayloadAttributesTopic>().await {
+                Ok(events) => break events,
+                Err(e) => {
+                    warn!(error = ?e, "Failed to subscribe to payload attributes, retrying...");
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
+            }
+        };
 
         let stream = events.filter_map(|event| {
             event
@@ -53,24 +65,38 @@ impl BeaconClient {
 
     /// Gets the lookahead for the given epoch. If `extended` is `true`, it will also fetch the
     /// lookahead for the next epoch, which is considered unstable.
+    ///
+    /// # Retries
+    /// This method will retry indefinitely in case of a failure.
     pub(super) async fn get_lookahead(
         &self,
         epoch: u64,
         extended: bool,
     ) -> Result<Vec<ProposerDuty>, Error> {
-        if extended {
-            let ((_, mut duties), (_, next_duties)) = tokio::try_join!(
-                self.client.get_proposer_duties(epoch),
-                self.client.get_proposer_duties(epoch + 1),
-            )?;
-
-            duties.extend(next_duties);
-
-            Ok(duties)
-        } else {
-            let (_, duties) = self.client.get_proposer_duties(epoch).await?;
-
-            Ok(duties)
+        loop {
+            if extended {
+                match tokio::try_join!(
+                    self.client.get_proposer_duties(epoch),
+                    self.client.get_proposer_duties(epoch + 1),
+                ) {
+                    Ok(((_, mut duties), (_, next_duties))) => {
+                        duties.extend(next_duties);
+                        break Ok(duties)
+                    }
+                    Err(e) => {
+                        warn!(error = ?e, "Failed to get proposer duties, retrying...");
+                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                    }
+                }
+            } else {
+                match self.client.get_proposer_duties(epoch).await {
+                    Ok((_, duties)) => break Ok(duties),
+                    Err(e) => {
+                        warn!(error = ?e, "Failed to get proposer duties, retrying...");
+                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                    }
+                }
+            };
         }
     }
 }

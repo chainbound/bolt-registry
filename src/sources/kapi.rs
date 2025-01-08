@@ -12,7 +12,7 @@ const VALIDATORS_PATH: &str = "/v1/preconfs/bolt-lido/validators";
 
 const DEFAULT_GAS_LIMIT: u64 = 10_000_000;
 
-struct KeysApi {
+pub(crate) struct KeysApi {
     client: reqwest::Client,
     /// The base URL of the API.
     url: Url,
