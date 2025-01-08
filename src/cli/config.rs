@@ -1,7 +1,7 @@
 use clap::Parser;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Parser)]
+#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub(crate) struct Config {
     /// The database connection string URL.
     #[clap(long, env = "DB_URL")]

@@ -1,6 +1,4 @@
-//! CLI options and flags.
-
-use std::{env, fs};
+//! CLI options parsing and configuration loading.
 
 use clap::{
     builder::{
@@ -9,8 +7,12 @@ use clap::{
     },
     Parser,
 };
-use eyre::Context;
+use figment::{
+    providers::{Env, Format, Toml},
+    Figment,
+};
 
+/// The program configuration structs.
 mod config;
 pub(crate) use config::Config;
 
@@ -23,20 +25,19 @@ pub(crate) struct Opts {
 }
 
 impl Opts {
-    /// Parse CLI options into the app [`Config`] struct.
+    /// Parse CLI options into the app [`Config`] struct and return it.
+    ///
+    /// This function will load the configuration from the TOML file and
+    /// override it with environment variables when they exist.
     pub(crate) fn parse_config() -> eyre::Result<Config> {
         dotenvy::dotenv()?;
 
         let opts = Self::parse();
 
-        let cfg = fs::read_to_string(opts.config).wrap_err("Failed to read config file")?;
-        let mut cfg: Config = toml::from_str(&cfg).wrap_err("Failed to parse TOML config file")?;
-
-        // overwrite TOML config with environment variables if set
-        // (useful for local development)
-        if let Ok(db_url_env) = env::var("DB_URL") {
-            cfg.db_url = db_url_env;
-        }
+        // 1. Load the configuration from the TOML file.
+        // 2. Merge the configuration with the environment variables.
+        // 3. Extract the configuration into the `Config` struct.
+        let cfg = Figment::new().merge(Toml::file(opts.config)).merge(Env::raw()).extract()?;
 
         Ok(cfg)
     }

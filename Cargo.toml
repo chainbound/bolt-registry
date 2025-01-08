@@ -20,6 +20,7 @@ async-trait = "0.1.85"
 
 # cli
 clap = { version = "4.5.4", features = ["derive", "env"] }
+figment = { version = "0.10.19", features = ["env", "toml"] }
 toml = "0.8.19"
 
 # observability
