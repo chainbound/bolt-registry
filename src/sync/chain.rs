@@ -4,12 +4,14 @@ use std::{
     task::{Context, Poll},
 };
 
-use beacon_api_client::{mainnet::MainnetClientTypes, Client, Error, PayloadAttributesTopic};
+use beacon_client::{
+    mainnet::MainnetClientTypes, Client, Error, PayloadAttributesTopic, ProposerDuty,
+};
 use reqwest::IntoUrl;
 use tokio_stream::{Stream, StreamExt};
 
 /// A client that can subscribe to SSE events.
-pub(super) struct EventsClient {
+pub(super) struct BeaconClient {
     client: Client<MainnetClientTypes>,
 }
 
@@ -20,7 +22,7 @@ pub(super) struct PayloadAttribute {
     parent_block_number: u64,
 }
 
-impl EventsClient {
+impl BeaconClient {
     pub(super) fn new(url: impl IntoUrl) -> Self {
         Self { client: Client::new(url.into_url().unwrap()) }
     }
@@ -47,6 +49,29 @@ impl EventsClient {
         });
 
         Ok(stream)
+    }
+
+    /// Gets the lookahead for the given epoch. If `extended` is `true`, it will also fetch the
+    /// lookahead for the next epoch, which is considered unstable.
+    pub(super) async fn get_lookahead(
+        &self,
+        epoch: u64,
+        extended: bool,
+    ) -> Result<Vec<ProposerDuty>, Error> {
+        if extended {
+            let ((_, mut duties), (_, next_duties)) = tokio::try_join!(
+                self.client.get_proposer_duties(epoch),
+                self.client.get_proposer_duties(epoch + 1),
+            )?;
+
+            duties.extend(next_duties);
+
+            Ok(duties)
+        } else {
+            let (_, duties) = self.client.get_proposer_duties(epoch).await?;
+
+            Ok(duties)
+        }
     }
 }
 
@@ -146,7 +171,7 @@ mod tests {
             return
         };
 
-        let client = EventsClient::new(beacon_url);
+        let client = BeaconClient::new(beacon_url);
         let mut stream = client.subscribe_payload_attributes().await.unwrap();
 
         let mut head_stream = client.client.get_events::<NewHeadsTopic>().await.unwrap();

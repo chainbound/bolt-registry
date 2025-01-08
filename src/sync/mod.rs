@@ -1,6 +1,6 @@
 //! Module `sync` contains functionality for syncing the registry with the chain, and other external
 //! data providers.
-use chain::{EpochTransitionStream, EventsClient};
+use chain::{BeaconClient, EpochTransition, EpochTransitionStream};
 use reqwest::IntoUrl;
 use thiserror::Error;
 use tokio::{sync::watch, task::JoinHandle};
@@ -50,16 +50,19 @@ impl SyncHandle {
 pub(crate) struct Syncer<Db> {
     db: Db,
     state: watch::Sender<SyncState>,
-    events_client: EventsClient,
+    events_client: BeaconClient,
 }
 
-impl<Db: RegistryDb> Syncer<Db> {
+impl<Db> Syncer<Db>
+where
+    Db: RegistryDb + Send + 'static,
+{
     /// Creates a new syncer with the given database.
     pub(crate) fn new(beacon_url: impl IntoUrl, db: Db) -> (Self, SyncHandle) {
         let (state_tx, state_rx) = watch::channel(SyncState::Synced);
         let handle = SyncHandle { state: state_rx };
 
-        let events_client = EventsClient::new(beacon_url);
+        let events_client = BeaconClient::new(beacon_url);
 
         let syncer = Self { db, state: state_tx, events_client };
 
@@ -67,22 +70,30 @@ impl<Db: RegistryDb> Syncer<Db> {
     }
 
     /// Spawns the [`Syncer`] actor task.
-    pub(crate) fn spawn(self) -> JoinHandle<Result<(), SyncError>> {
+    pub(crate) fn spawn(mut self) -> JoinHandle<Result<(), SyncError>> {
         tokio::spawn(async move {
             let pa_stream = self.events_client.subscribe_payload_attributes().await?;
 
             let mut epoch_stream = EpochTransitionStream::new(pa_stream);
 
             while let Some(transition) = epoch_stream.next().await {
-                info!(
-                    epoch = transition.epoch,
-                    slot = transition.slot,
-                    block_number = transition.block_number,
-                    "New epoch transition"
-                );
+                self.on_transition(transition);
             }
 
             Ok(())
         })
+    }
+
+    /// Handles an epoch transition event.
+    fn on_transition(&mut self, transition: EpochTransition) {
+        info!(
+            epoch = transition.epoch,
+            slot = transition.slot,
+            block_number = transition.block_number,
+            "New epoch transition"
+        );
+
+        // Update to syncing state
+        let _ = self.state.send(SyncState::Syncing);
     }
 }
