@@ -1,22 +1,11 @@
 //! Entrypoint.
-<<<<<<< HEAD
-use api::{actions::Action, ApiConfig, RegistryApi};
-use config::RegistryConfig;
-use db::DummyDb;
-use registry::Registry;
-=======
 
->>>>>>> 6c5d96b (feat(db): added SQL db abstraction; minor nits; config file parsing)
 use tokio_stream::StreamExt;
 use tracing::{error, info};
 
 mod api;
-<<<<<<< HEAD
-mod config;
-=======
 use api::{actions::Action, ApiConfig, RegistryApi};
 
->>>>>>> 6c5d96b (feat(db): added SQL db abstraction; minor nits; config file parsing)
 mod db;
 use db::SQLDb;
 
@@ -37,16 +26,10 @@ async fn main() -> eyre::Result<()> {
 
     info!("Starting bolt registry server...");
 
-<<<<<<< HEAD
-    let config = RegistryConfig { beacon_url: "http://remotebeast:44400".into() };
-
-    let mut registry = Registry::new(config, DummyDb);
-=======
     let config = cli::Opts::parse_config()?;
 
     let db = SQLDb::new(&config.db_url).await?;
-    let mut registry = Registry::new(db);
->>>>>>> 6c5d96b (feat(db): added SQL db abstraction; minor nits; config file parsing)
+    let mut registry = Registry::new(config, db);
 
     let (srv, mut actions) = RegistryApi::new(ApiConfig::default());
 

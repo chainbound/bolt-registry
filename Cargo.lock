@@ -1127,7 +1127,6 @@ dependencies = [
  "thiserror 2.0.9",
  "tokio",
  "tokio-stream",
- "toml 0.8.19",
  "tracing",
  "tracing-subscriber",
  "url",

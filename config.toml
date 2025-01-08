@@ -4,6 +4,9 @@ operators_registry = "0x..."
 # Postgres database configuration
 db_url = "postgres://boltadmin:$PASSWORD@remotebeast:5412/bolt_registry"
 
+# Beacon node connection
+beacon_url = "http://remotebeast:44400"
+
 # Data sources
 # These data sources take precedence over the registry. Their values are canonical.
 #
