@@ -40,7 +40,6 @@ pub(crate) enum DbError {
 }
 
 /// Registry database trait.
-#[async_trait::async_trait]
 pub(crate) trait RegistryDb: Clone {
     /// Register validators in the database.
     async fn register_validators(&self, registration: Registration) -> DbResult<()>;

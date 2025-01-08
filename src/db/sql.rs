@@ -45,7 +45,6 @@ impl<Db: sqlx::Database> Clone for SQLDb<Db> {
     }
 }
 
-#[async_trait::async_trait]
 impl RegistryDb for SQLDb<Postgres> {
     async fn register_validators(&self, registration: Registration) -> DbResult<()> {
         if registration.validator_pubkeys.len() != registration.signatures.len() {
