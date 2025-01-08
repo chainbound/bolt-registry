@@ -10,7 +10,6 @@ use tracing::info;
 use crate::db::RegistryDb;
 
 mod chain;
-mod head_tracker;
 
 #[derive(Debug, Error)]
 pub(crate) enum SyncError {

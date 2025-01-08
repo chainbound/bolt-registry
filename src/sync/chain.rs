@@ -118,6 +118,7 @@ mod tests {
     use alloy::primitives::B256;
     use beacon_api_client::Topic;
     use serde::Deserialize;
+    use tracing::{warn, Level};
 
     use super::*;
 
@@ -138,7 +139,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_subscribe() {
-        let client = EventsClient::new("http://remotebeast:44400");
+        let _ = tracing_subscriber::fmt().with_max_level(Level::INFO).try_init();
+
+        let Ok(beacon_url) = std::env::var("BEACON_URL") else {
+            warn!("Skipping test because of missing BEACON_URL");
+            return
+        };
+
+        let client = EventsClient::new(beacon_url);
         let mut stream = client.subscribe_payload_attributes().await.unwrap();
 
         let mut head_stream = client.client.get_events::<NewHeadsTopic>().await.unwrap();
