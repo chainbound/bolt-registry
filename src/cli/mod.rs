@@ -1,6 +1,6 @@
 //! CLI options and flags.
 
-use std::fs;
+use std::{env, fs};
 
 use clap::{
     builder::{
@@ -25,10 +25,20 @@ pub(crate) struct Opts {
 impl Opts {
     /// Parse CLI options into the app [`Config`] struct.
     pub(crate) fn parse_config() -> eyre::Result<Config> {
+        dotenvy::dotenv()?;
+
         let opts = Self::parse();
 
-        let cfg = fs::read_to_string(opts.config).wrap_err("Failed to read configuration file")?;
-        toml::from_str(&cfg).wrap_err("Failed to parse TOML configuration file")
+        let cfg = fs::read_to_string(opts.config).wrap_err("Failed to read config file")?;
+        let mut cfg: Config = toml::from_str(&cfg).wrap_err("Failed to parse TOML config file")?;
+
+        // overwrite TOML config with environment variables if set
+        // (useful for local development)
+        if let Ok(db_url_env) = env::var("DB_URL") {
+            cfg.db_url = db_url_env;
+        }
+
+        Ok(cfg)
     }
 }
 

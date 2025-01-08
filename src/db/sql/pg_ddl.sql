@@ -16,6 +16,17 @@ BEGIN
     END IF;
 END $$;
 
+-- Create the operators table if it does not exist
+CREATE TABLE IF NOT EXISTS operators (
+    signer BYTEA PRIMARY KEY,             -- Unique identifier for the operator
+    rpc TEXT NOT NULL,                    -- RPC endpoint
+    protocol protocol_enum,               -- Protocol type (optional)
+    source source_enum NOT NULL,          -- Source of the operator data
+    collateral_tokens BYTEA[] NOT NULL,   -- Array of collateral token identifiers
+    collateral_amounts BYTEA[] NOT NULL,  -- Array of collateral token amounts
+    last_update TIMESTAMP NOT NULL        -- Last time this record was updated
+);
+
 -- Create the validator_registrations table if it does not exist
 CREATE TABLE IF NOT EXISTS validator_registrations (
     pubkey BYTEA PRIMARY KEY,                              -- BLS public key of the validator
@@ -26,15 +37,4 @@ CREATE TABLE IF NOT EXISTS validator_registrations (
     priority SMALLINT NOT NULL,                            -- Priority level of this registration
     source source_enum NOT NULL,                           -- Source of the registration data
     last_update TIMESTAMP NOT NULL                         -- Last time this record was updated
-);
-
--- Create the operators table if it does not exist
-CREATE TABLE IF NOT EXISTS operators (
-    signer BYTEA PRIMARY KEY,             -- Unique identifier for the operator
-    rpc TEXT NOT NULL,                    -- RPC endpoint
-    protocol protocol_enum,               -- Protocol type (optional)
-    source source_enum NOT NULL,          -- Source of the operator data
-    collateral_tokens BYTEA[] NOT NULL,   -- Array of collateral token identifiers
-    collateral_amounts BYTEA[] NOT NULL,  -- Array of collateral token amounts
-    last_update TIMESTAMP NOT NULL        -- Last time this record was updated
 );
