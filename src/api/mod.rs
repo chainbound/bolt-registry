@@ -19,6 +19,7 @@ use tokio::{
     },
     task::JoinHandle,
 };
+use tracing::error;
 
 use crate::primitives::{
     registry::{Deregistration, Lookahead, Operator, Registration, RegistryEntry},
@@ -101,7 +102,9 @@ impl RegistryApi {
         let listener = TcpListener::bind(&listen_addr).await?;
 
         Ok(tokio::spawn(async move {
-            axum::serve(listener, router).await.unwrap();
+            if let Err(err) = axum::serve(listener, router).await {
+                error!("API server crashed: {}", err);
+            }
         }))
     }
 

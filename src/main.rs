@@ -34,6 +34,7 @@ mod cli;
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     tracing_subscriber::fmt::init();
+
     info!("Starting bolt registry server...");
 
 <<<<<<< HEAD

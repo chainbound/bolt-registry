@@ -18,7 +18,7 @@ impl RegistryDb for NoOpDb {
     async fn get_operator(&self, signer: Address) -> DbResult<Operator> {
         Ok(Operator {
             signer,
-            rpc_endpoint: "https://grugbrain.dev".parse().unwrap(),
+            rpc_endpoint: "https://grugbrain.dev".parse()?,
             collateral_tokens: vec![],
             collateral_amounts: vec![],
         })

@@ -18,14 +18,14 @@ END $$;
 
 -- Create the validator_registrations table if it does not exist
 CREATE TABLE IF NOT EXISTS validator_registrations (
-    pubkey BYTEA PRIMARY KEY,             -- BLS public key of the validator
-    signature BYTEA NOT NULL,             -- Signature of the registration
-    expiry BIGINT NOT NULL,               -- Expiry timestamp of the registration
-    gas_limit BIGINT NOT NULL,            -- Gas limit for the validator
-    operator BYTEA NOT NULL,              -- Operator address (foreign key)
-    priority SMALLINT NOT NULL,           -- Priority level of this registration
-    source source_enum NOT NULL,          -- Source of the registration data
-    last_update TIMESTAMP NOT NULL        -- Last time this record was updated
+    pubkey BYTEA PRIMARY KEY,                              -- BLS public key of the validator
+    signature BYTEA NOT NULL,                              -- Signature of the registration
+    expiry BIGINT NOT NULL,                                -- Expiry timestamp of the registration
+    gas_limit BIGINT NOT NULL,                             -- Gas limit for the validator
+    operator BYTEA NOT NULL REFERENCES operators(signer),  -- Operator address (foreign key)
+    priority SMALLINT NOT NULL,                            -- Priority level of this registration
+    source source_enum NOT NULL,                           -- Source of the registration data
+    last_update TIMESTAMP NOT NULL                         -- Last time this record was updated
 );
 
 -- Create the operators table if it does not exist
@@ -38,19 +38,3 @@ CREATE TABLE IF NOT EXISTS operators (
     collateral_amounts BYTEA[] NOT NULL,  -- Array of collateral token amounts
     last_update TIMESTAMP NOT NULL        -- Last time this record was updated
 );
-
--- Add foreign key constraint if it doesn't exist
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.table_constraints 
-        WHERE constraint_name = 'fk_operator_signer'
-        AND table_name = 'validator_registrations'
-    ) THEN
-        ALTER TABLE validator_registrations
-        ADD CONSTRAINT fk_operator_signer
-        FOREIGN KEY (operator) 
-        REFERENCES operators(signer);
-    END IF;
-END $$;

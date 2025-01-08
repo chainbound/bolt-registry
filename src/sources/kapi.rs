@@ -29,8 +29,8 @@ struct ValidatorEntry {
 }
 
 impl KeysApi {
-    pub(crate) fn new(base_url: impl AsRef<str>) -> Self {
-        Self { client: reqwest::Client::new(), url: Url::parse(base_url.as_ref()).unwrap() }
+    pub(crate) fn new(base_url: Url) -> Self {
+        Self { client: reqwest::Client::new(), url: base_url }
     }
 
     /// Fetches validators by `pubkeys` from the API.
@@ -60,6 +60,7 @@ impl KeysApi {
         let url = self.url.join(VALIDATORS_PATH).unwrap();
         let pubkeys_query =
             pubkeys.iter().map(|pubkey| pubkey.to_string()).collect::<Vec<_>>().join(",");
+
         self.client.get(url).query(&[("pubkeys", pubkeys_query)])
     }
 }
@@ -69,28 +70,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_keys_api() {
+    fn test_keys_api() -> eyre::Result<()> {
         // Url displays a trailing backslash, so need to add that here
-        let url = "http://34.88.187.80:30303/";
-        let keys_api = KeysApi::new(url);
-
-        assert_eq!(keys_api.url.as_str(), url);
-
-        let url = url.to_string();
+        let url = Url::parse("http://34.88.187.80:30303/")?;
         let keys_api = KeysApi::new(url.clone());
 
-        assert_eq!(keys_api.url.as_str(), url.as_str());
+        assert_eq!(keys_api.url, url);
+        Ok(())
     }
 
     #[test]
-    fn test_get_validators_request() {
-        let url = "http://34.88.187.80:30303/";
+    fn test_get_validators_request() -> eyre::Result<()> {
+        let url = Url::parse("http://34.88.187.80:30303/")?;
         let keys_api = KeysApi::new(url);
 
         let pubkeys = vec![BlsPublicKey::random(), BlsPublicKey::random(), BlsPublicKey::random()];
 
         let request = keys_api.get_validators_request(pubkeys);
 
-        println!("{}", request.build().unwrap().url())
+        println!("{}", request.build()?.url());
+
+        Ok(())
     }
 }
