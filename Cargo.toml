@@ -16,6 +16,7 @@ resolver = "2"
 # async
 tokio = { version = "1.42", features = ["rt-multi-thread", "sync"] }
 tokio-stream = "0.1.17"
+async-trait = "0.1"
 
 # cli
 clap = { version = "4.5.4", features = ["derive", "env"] }

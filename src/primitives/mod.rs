@@ -12,17 +12,9 @@ impl BlsPublicKey {
         Self(bls::Keypair::random().pk)
     }
 
-    /// Helper function to convert the public key from the `ethereum_consensus` crate.
-    pub(crate) fn from_consensus(pk: ethereum_consensus::primitives::BlsPublicKey) -> Self {
-        let bytes = bls::PublicKey::deserialize(pk.as_ref()).expect("valid BLS public key");
-        Self::from(bytes)
-    }
-
-    /// Helper function to convert the public key to the `ethereum_consensus` crate.
-    pub(crate) fn to_consensus(&self) -> ethereum_consensus::primitives::BlsPublicKey {
-        let bytes = self.compress().serialize();
-        ethereum_consensus::primitives::BlsPublicKey::try_from(bytes.as_ref())
-            .expect("valid BLS public key")
+    /// Creates a new `BlsPublicKey` from a compressed byte slice.
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self, bls::Error> {
+        Ok(Self(bls::PublicKey::deserialize(bytes)?))
     }
 }
 

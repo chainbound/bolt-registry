@@ -1,5 +1,8 @@
 //! Module `sync` contains functionality for syncing the registry with the chain, and other external
 //! data providers.
+use std::collections::HashMap;
+
+use alloy::primitives::Address;
 use beacon_client::ProposerDuty;
 use chain::{BeaconClient, EpochTransition, EpochTransitionStream};
 use reqwest::IntoUrl;
@@ -8,7 +11,11 @@ use tokio::{sync::watch, task::JoinHandle};
 use tokio_stream::StreamExt;
 use tracing::{error, info};
 
-use crate::{db::RegistryDb, sources::kapi::KeysApi};
+use crate::{
+    db::RegistryDb,
+    primitives::{registry::Registration, BlsPublicKey},
+    sources::kapi::KeysApi,
+};
 
 mod chain;
 
@@ -106,6 +113,7 @@ where
 
     /// Handles an epoch transition event.
     async fn on_transition(&mut self, transition: EpochTransition) {
+        let start = std::time::Instant::now();
         info!(
             epoch = transition.epoch,
             slot = transition.slot,
@@ -125,6 +133,8 @@ where
         };
 
         self.sync_lookahead(lookahead).await;
+
+        info!(elapsed = ?start.elapsed(), "Transition handled");
     }
 
     /// Syncs contract events from the last known block number to the given block number.
@@ -135,7 +145,49 @@ where
         todo!()
     }
 
+    /// Syncs the lookahead with external data sources.
     async fn sync_lookahead(&mut self, lookahead: Vec<ProposerDuty>) {
-        todo!()
+        let pubkeys = lookahead
+            .into_iter()
+            .map(|duty| {
+                BlsPublicKey::from_bytes(&duty.public_key).expect("failed to parse public key")
+            })
+            .collect::<Vec<_>>();
+
+        let start = std::time::Instant::now();
+        let entries = loop {
+            match self.keys_api.get_validators(&pubkeys).await {
+                Ok(registrations) => break registrations,
+                Err(e) => {
+                    error!(error = ?e, "Failed to get validators from keys API, retrying...");
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                }
+            }
+        };
+
+        info!(count = entries.len(), elapsed = ?start.elapsed(), "Queried entries from keys API");
+
+        // Extract unique registrations, keyed by operator address
+        let mut registrations: HashMap<Address, Registration> = HashMap::new();
+
+        for entry in entries {
+            registrations
+                .entry(entry.operator)
+                .and_modify(|r| r.validator_pubkeys.push(entry.validator_pubkey.clone()))
+                .or_insert(Registration {
+                    validator_pubkeys: vec![entry.validator_pubkey.clone()],
+                    operator: entry.operator,
+                    gas_limit: entry.gas_limit,
+                    expiry: 0,
+                    signatures: vec![],
+                });
+        }
+
+        for registration in registrations.into_values() {
+            // TODO: retries on transient faults (e.g. network errors)
+            if let Err(e) = self.db.register_validators(registration).await {
+                error!(error = ?e, "Failed to register validators in the database");
+            }
+        }
     }
 }

@@ -22,6 +22,7 @@ pub(crate) use sql::SQLDb;
 pub(crate) type DbResult<T> = Result<T, DbError>;
 
 /// Database error type.
+// TODO: Implement `is_transient` or `is_retryable` methods.
 #[derive(Debug, thiserror::Error)]
 #[allow(missing_docs)]
 pub(crate) enum DbError {
@@ -40,6 +41,7 @@ pub(crate) enum DbError {
 }
 
 /// Registry database trait.
+#[async_trait::async_trait]
 pub(crate) trait RegistryDb: Clone {
     /// Register validators in the database.
     async fn register_validators(&self, registrations: &[Registration]) -> DbResult<()>;

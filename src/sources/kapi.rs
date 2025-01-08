@@ -39,7 +39,7 @@ impl KeysApi {
     /// Fetches validators by `pubkeys` from the API.
     pub(crate) async fn get_validators(
         &self,
-        pubkeys: Vec<BlsPublicKey>,
+        pubkeys: &[BlsPublicKey],
     ) -> Result<Vec<RegistryEntry>, reqwest::Error> {
         let response = self.get_validators_request(pubkeys).send().await?;
 
@@ -59,7 +59,7 @@ impl KeysApi {
     }
 
     #[inline]
-    fn get_validators_request(&self, pubkeys: Vec<BlsPublicKey>) -> RequestBuilder {
+    fn get_validators_request(&self, pubkeys: &[BlsPublicKey]) -> RequestBuilder {
         let url = self.url.join(VALIDATORS_PATH).unwrap();
         let pubkeys_query =
             pubkeys.iter().map(|pubkey| pubkey.to_string()).collect::<Vec<_>>().join(",");
@@ -89,7 +89,7 @@ mod tests {
 
         let pubkeys = vec![BlsPublicKey::random(), BlsPublicKey::random(), BlsPublicKey::random()];
 
-        let request = keys_api.get_validators_request(pubkeys);
+        let request = keys_api.get_validators_request(&pubkeys);
 
         println!("{}", request.build()?.url());
 

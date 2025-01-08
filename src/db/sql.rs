@@ -45,6 +45,7 @@ impl<Db: sqlx::Database> Clone for SQLDb<Db> {
     }
 }
 
+#[async_trait::async_trait]
 impl RegistryDb for SQLDb<Postgres> {
     async fn register_validators(&self, registrations: &[Registration]) -> DbResult<()> {
         let mut transaction = self.conn.begin().await?;
