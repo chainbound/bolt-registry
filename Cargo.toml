@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 # rust-version = "1.83"
 exclude = [".github/"]
-authors = ["Chainbound <admin@chainbound.io>"]
+authors = ["Chainbound <dev@chainbound.io>"]
 repository = "https://github.com/chainbound/bolt-registry"
 
 # Explicitly set the resolver to version 2, which is the default for packages with edition >= 2021
