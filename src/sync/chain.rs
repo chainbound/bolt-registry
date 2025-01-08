@@ -139,20 +139,21 @@ where
         loop {
             match Pin::new(&mut this.pa_stream).poll_next(cx) {
                 Poll::Ready(Some(pa)) => {
+                    let current_slot = pa.proposal_slot - 1;
                     // De-duplicate
-                    if pa.proposal_slot - 1 <= this.proposal_slot {
+                    if pa.proposal_slot <= this.proposal_slot {
                         continue;
                     }
 
                     // Update last known proposal slot
                     this.proposal_slot = pa.proposal_slot;
 
-                    let epoch = (pa.proposal_slot - 1) / 32;
+                    let epoch = current_slot / 32;
                     if epoch > this.epoch {
                         this.epoch = epoch;
                         return Poll::Ready(Some(EpochTransition {
                             epoch,
-                            slot: pa.proposal_slot - 1,
+                            slot: current_slot,
                             block_number: pa.parent_block_number,
                         }));
                     }
