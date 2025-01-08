@@ -7,4 +7,6 @@ pub(crate) struct Config {
     pub(crate) db_url: String,
     /// The URL of the remote beacon node.
     pub(crate) beacon_url: String,
+    /// The URL of the keys API.
+    pub(crate) keys_api_url: String,
 }
