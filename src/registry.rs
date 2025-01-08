@@ -1,6 +1,10 @@
+use tracing::info;
+
 use crate::{
+    api::spec::RegistryError,
     cli::Config,
     db::RegistryDb,
+    primitives::registry::Registration,
     sync::{SyncHandle, Syncer},
 };
 
@@ -20,5 +24,18 @@ impl<Db: RegistryDb> Registry<Db> {
         let _sync_task = syncer.spawn();
 
         Self { db, sync: handle }
+    }
+
+    pub(crate) async fn register_validators(
+        &self,
+        registration: Registration,
+    ) -> Result<(), RegistryError> {
+        let count = registration.validator_pubkeys.len();
+        let operator = registration.operator;
+
+        self.db.register_validators(registration).await?;
+        info!(%count, %operator, "Validators registered successfully");
+
+        Ok(())
     }
 }

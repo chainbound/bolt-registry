@@ -39,7 +39,10 @@ async fn main() -> eyre::Result<()> {
 
     while let Some(action) = actions.next().await {
         match action {
-            Action::Register { registration, response } => todo!(),
+            Action::Register { registration, response } => {
+                let res = registry.register_validators(registration).await;
+                let _ = response.send(res);
+            }
             Action::Deregister { deregistration, response } => todo!(),
             Action::GetRegistrations { response } => todo!(),
             Action::GetValidators { response } => todo!(),

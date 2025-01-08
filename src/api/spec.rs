@@ -77,6 +77,8 @@ pub(crate) enum RegistryError {
     BufferFull(#[from] SendTimeoutError<Action>),
     #[error("Internal Server Error")]
     ReponseChannelDropped(#[from] RecvError),
+    #[error("Internal Server Error")]
+    Database(#[from] crate::db::DbError),
 }
 
 impl IntoResponse for RegistryError {
