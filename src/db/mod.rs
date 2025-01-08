@@ -50,9 +50,6 @@ pub(crate) trait RegistryDb: Clone {
     /// Register an operator in the database.
     async fn register_operator(&self, operator: Operator) -> DbResult<()>;
 
-    /// Get an operator from the database.
-    async fn get_operator(&self, signer: Address) -> DbResult<Operator>;
-
     /// Get a batch of registrations from the database, by their public keys.
     ///
     /// If no public keys are provided, return all registrations in the registry.
@@ -68,4 +65,9 @@ pub(crate) trait RegistryDb: Clone {
         &self,
         pubkeys: Option<&[BlsPublicKey]>,
     ) -> DbResult<Vec<RegistryEntry>>;
+
+    /// Get a batch of operators from the database, by their addresses.
+    ///
+    /// If no addresses are provided, return all operators in the registry.
+    async fn get_operators(&self, signers: Option<&[Address]>) -> DbResult<Vec<Operator>>;
 }

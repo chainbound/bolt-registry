@@ -1,3 +1,4 @@
+use alloy::primitives::Address;
 use tracing::info;
 
 use crate::{
@@ -5,7 +6,7 @@ use crate::{
     cli::Config,
     db::RegistryDb,
     primitives::{
-        registry::{DeregistrationBatch, Registration, RegistrationBatch, RegistryEntry},
+        registry::{DeregistrationBatch, Operator, Registration, RegistrationBatch, RegistryEntry},
         BlsPublicKey,
     },
     sync::{SyncHandle, Syncer},
@@ -71,5 +72,13 @@ impl<Db: RegistryDb> Registry<Db> {
     ) -> Result<Vec<RegistryEntry>, RegistryError> {
         self.sync.wait_for_sync().await;
         Ok(self.db.get_validators(pubkeys).await?)
+    }
+
+    pub(crate) async fn get_operators(
+        &mut self,
+        signers: Option<&[Address]>,
+    ) -> Result<Vec<Operator>, RegistryError> {
+        self.sync.wait_for_sync().await;
+        Ok(self.db.get_operators(signers).await?)
     }
 }

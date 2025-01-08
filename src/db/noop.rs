@@ -22,15 +22,6 @@ impl RegistryDb for NoOpDb {
         Ok(())
     }
 
-    async fn get_operator(&self, signer: Address) -> DbResult<Operator> {
-        Ok(Operator {
-            signer,
-            rpc_endpoint: "https://grugbrain.dev".parse()?,
-            collateral_tokens: vec![],
-            collateral_amounts: vec![],
-        })
-    }
-
     async fn get_registrations(
         &self,
         pubkeys: Option<&[BlsPublicKey]>,
@@ -54,5 +45,9 @@ impl RegistryDb for NoOpDb {
             gas_limit: 0,
             rpc_endpoint: "https://grugbrain.dev".parse()?,
         }])
+    }
+
+    async fn get_operators(&self, _signers: Option<&[Address]>) -> DbResult<Vec<Operator>> {
+        Ok(vec![])
     }
 }

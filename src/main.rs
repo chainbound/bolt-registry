@@ -70,14 +70,16 @@ async fn main() -> eyre::Result<()> {
                 let _ = response.send(first_validator_res.unwrap_or(Err(RegistryError::NotFound)));
             }
             Action::GetOperator { signer, response } => {
-                // let res = registry.get_operator(signer).await;
-                // let _ = response.send(res);
+                let res = registry.get_operators(Some(&[signer])).await;
+                let first_operator_res = res.map(|mut o| o.pop()).transpose();
+                let _ = response.send(first_operator_res.unwrap_or(Err(RegistryError::NotFound)));
             }
             Action::GetOperators { response } => {
-                // let res = registry.get_operators().await;
-                // let _ = response.send(res);
+                let res = registry.get_operators(None).await;
+                let _ = response.send(res);
             }
             Action::GetLookahead { epoch, response } => {
+                // TODO: fetch lookahead from beacon node
                 // let res = registry.get_lookahead(epoch).await;
                 // let _ = response.send(res);
             }

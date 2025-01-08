@@ -105,21 +105,6 @@ impl RegistryDb for SQLDb<Postgres> {
         Ok(())
     }
 
-    async fn get_operator(&self, signer: Address) -> DbResult<Operator> {
-        let row: OperatorRow = sqlx::query_as(
-            "
-            SELECT signer, rpc, protocol, source, collateral_tokens, collateral_amounts, last_update
-            FROM operators
-            WHERE signer = $1
-            ",
-        )
-        .bind(signer.to_vec())
-        .fetch_one(&self.conn)
-        .await?;
-
-        row.try_into()
-    }
-
     async fn get_registrations(
         &self,
         pubkeys: Option<&[BlsPublicKey]>,
@@ -171,6 +156,33 @@ impl RegistryDb for SQLDb<Postgres> {
                 "
                 SELECT vr.pubkey, vr.signature, vr.expiry, vr.gas_limit, vr.operator, vr.priority, vr.source, vr.last_update, o.rpc
                 FROM validator_registrations vr LEFT JOIN operators o ON o.signer = vr.operator
+                ",
+            )
+            .fetch_all(&self.conn)
+            .await?
+        };
+
+        rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn get_operators(&self, signers: Option<&[Address]>) -> DbResult<Vec<Operator>> {
+        let rows: Vec<OperatorRow> = if let Some(signers) = signers {
+            sqlx::query_as(
+                "
+                SELECT signer, rpc, protocol, source, collateral_tokens, collateral_amounts, last_update
+                FROM operators
+                WHERE signer = ANY($1)
+                ",
+            )
+            .bind(signers.iter().map(|s| s.to_vec()).collect::<Vec<_>>())
+            .fetch_all(&self.conn)
+            .await?
+        } else {
+            // fetch all operators if no signers are provided
+            sqlx::query_as(
+                "
+                SELECT signer, rpc, protocol, source, collateral_tokens, collateral_amounts, last_update
+                FROM operators
                 ",
             )
             .fetch_all(&self.conn)
