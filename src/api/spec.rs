@@ -81,7 +81,7 @@ pub(crate) enum RegistryError {
     BufferFull(#[from] SendTimeoutError<Action>),
     #[error("Internal Server Error")]
     ReponseChannelDropped(#[from] RecvError),
-    #[error("404 Not Found")]
+    #[error("Not Found")]
     NotFound,
     #[error("Internal Server Error")]
     Database(#[from] DbError),
@@ -93,8 +93,21 @@ pub(crate) enum RegistryError {
 
 impl IntoResponse for RegistryError {
     fn into_response(self) -> axum::response::Response {
-        json_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
-            .into_response()
+        match self {
+            Self::BufferFull(_) |
+            Self::ReponseChannelDropped(_) |
+            Self::Database(_) |
+            Self::Beacon(_) => {
+                json_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Internal Server Error")
+                    .into_response()
+            }
+            Self::NotFound => {
+                json_error_response(StatusCode::NOT_FOUND, "Not Found").into_response()
+            }
+            Self::BadRequest(_) => {
+                json_error_response(StatusCode::BAD_REQUEST, &self.to_string()).into_response()
+            }
+        }
     }
 }
 
