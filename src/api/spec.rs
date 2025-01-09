@@ -7,10 +7,14 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::{mpsc::error::SendTimeoutError, oneshot::error::RecvError};
 
-use super::actions::Action;
-use crate::primitives::{
-    registry::{Deregistration, Lookahead, Operator, Registration, RegistryEntry},
-    BlsPublicKey,
+use super::{actions::Action, DeregistrationBatch, RegistrationBatch};
+use crate::{
+    client::beacon::BeaconClientError,
+    db::DbError,
+    primitives::{
+        registry::{Lookahead, Operator, Registration, RegistryEntry},
+        BlsPublicKey,
+    },
 };
 
 // validator endpoints
@@ -28,10 +32,10 @@ pub(super) const DISCOVERY_LOOKAHEAD_PATH: &str = "/registry/v1/discovery/lookah
 /// The registry API spec for validators.
 pub(super) trait ValidatorSpec {
     /// /registry/v1/validators/register
-    async fn register(&self, registration: Registration) -> Result<(), RegistryError>;
+    async fn register(&self, registration: RegistrationBatch) -> Result<(), RegistryError>;
 
     /// /registry/v1/validators/deregister
-    async fn deregister(&self, deregistration: Deregistration) -> Result<(), RegistryError>;
+    async fn deregister(&self, deregistration: DeregistrationBatch) -> Result<(), RegistryError>;
 
     /// /registry/v1/validators/registrations
     async fn get_registrations(&self) -> Result<Vec<Registration>, RegistryError>;
@@ -77,6 +81,14 @@ pub(crate) enum RegistryError {
     BufferFull(#[from] SendTimeoutError<Action>),
     #[error("Internal Server Error")]
     ReponseChannelDropped(#[from] RecvError),
+    #[error("404 Not Found")]
+    NotFound,
+    #[error("Internal Server Error")]
+    Database(#[from] DbError),
+    #[error("Internal Server Error")]
+    Beacon(#[from] BeaconClientError),
+    #[error("Bad Request: {0}")]
+    BadRequest(&'static str),
 }
 
 impl IntoResponse for RegistryError {

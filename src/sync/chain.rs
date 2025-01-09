@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use beacon_client::{mainnet::MainnetClientTypes, Client, Error, PayloadAttributesTopic};
+use beacon_api_client::{mainnet::MainnetClientTypes, Client, Error, PayloadAttributesTopic};
 use reqwest::IntoUrl;
 use tokio_stream::{Stream, StreamExt};
 
@@ -116,7 +116,7 @@ where
 #[cfg(test)]
 mod tests {
     use alloy::primitives::B256;
-    use beacon_client::Topic;
+    use beacon_api_client::Topic;
     use serde::Deserialize;
 
     use super::*;

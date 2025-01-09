@@ -15,7 +15,7 @@ mod head_tracker;
 #[derive(Debug, Error)]
 pub(crate) enum SyncError {
     #[error(transparent)]
-    Beacon(#[from] beacon_client::Error),
+    Beacon(#[from] beacon_api_client::Error),
 }
 
 enum SyncState {

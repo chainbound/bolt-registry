@@ -1,12 +1,20 @@
 use alloy::primitives::Address;
 
-use super::{BlsPublicKey, DbResult, Operator, Registration, RegistryDb};
+use crate::primitives::BlsSignature;
+
+use super::{
+    BlsPublicKey, DbResult, Deregistration, Operator, Registration, RegistryDb, RegistryEntry,
+};
 
 #[derive(Debug, Clone)]
 pub(crate) struct NoOpDb;
 
 impl RegistryDb for NoOpDb {
-    async fn register_validators(&self, _registration: Registration) -> DbResult<()> {
+    async fn register_validators(&self, _registration: &[Registration]) -> DbResult<()> {
+        Ok(())
+    }
+
+    async fn deregister_validators(&self, _deregistration: &[Deregistration]) -> DbResult<()> {
         Ok(())
     }
 
@@ -14,22 +22,49 @@ impl RegistryDb for NoOpDb {
         Ok(())
     }
 
-    async fn get_operator(&self, signer: Address) -> DbResult<Operator> {
-        Ok(Operator {
-            signer,
-            rpc_endpoint: "https://grugbrain.dev".parse()?,
-            collateral_tokens: vec![],
-            collateral_amounts: vec![],
-        })
+    async fn list_registrations(&self) -> DbResult<Vec<Registration>> {
+        Ok(vec![])
     }
 
-    async fn get_validator_registration(&self, pubkey: BlsPublicKey) -> DbResult<Registration> {
-        Ok(Registration {
-            validator_pubkeys: vec![pubkey],
-            operator: Address::default(),
+    async fn get_registrations_by_pubkey(
+        &self,
+        pubkeys: &[BlsPublicKey],
+    ) -> DbResult<Vec<Registration>> {
+        Ok(vec![Registration {
+            validator_pubkey: pubkeys.first().unwrap().clone(),
+            validator_index: 0,
+            operator: Address::random(),
             gas_limit: 0,
             expiry: 0,
-            signatures: vec![],
-        })
+            signature: BlsSignature::empty(),
+        }])
+    }
+
+    async fn list_validators(&self) -> DbResult<Vec<RegistryEntry>> {
+        Ok(vec![])
+    }
+
+    async fn get_validators_by_pubkey(
+        &self,
+        pubkeys: &[BlsPublicKey],
+    ) -> DbResult<Vec<RegistryEntry>> {
+        Ok(vec![RegistryEntry {
+            validator_pubkey: pubkeys.first().unwrap().clone(),
+            operator: Address::random(),
+            gas_limit: 0,
+            rpc_endpoint: "https://grugbrain.dev".parse()?,
+        }])
+    }
+
+    async fn get_validators_by_index(&self, _indices: Vec<usize>) -> DbResult<Vec<RegistryEntry>> {
+        Ok(vec![])
+    }
+
+    async fn list_operators(&self) -> DbResult<Vec<Operator>> {
+        Ok(vec![])
+    }
+
+    async fn get_operators_by_signer(&self, _signers: &[Address]) -> DbResult<Vec<Operator>> {
+        Ok(vec![])
     }
 }

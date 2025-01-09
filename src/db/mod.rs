@@ -5,7 +5,7 @@ use std::array::TryFromSliceError;
 use alloy::primitives::Address;
 
 use crate::primitives::{
-    registry::{Operator, Registration},
+    registry::{Deregistration, Operator, Registration, RegistryEntry},
     BlsPublicKey,
 };
 
@@ -35,21 +35,45 @@ pub(crate) enum DbError {
     ParseBLSKey(bls::Error),
     #[error("Failed to parse integer: {0}")]
     ParseUint(&'static str),
-    #[error("Database invariant violation: {0}")]
-    Invariant(&'static str),
+    #[error("Missing field from query result: {0}")]
+    MissingField(&'static str),
 }
 
 /// Registry database trait.
 pub(crate) trait RegistryDb: Clone {
     /// Register validators in the database.
-    async fn register_validators(&self, registration: Registration) -> DbResult<()>;
+    async fn register_validators(&self, registrations: &[Registration]) -> DbResult<()>;
+
+    /// Deregister validators in the database.
+    async fn deregister_validators(&self, deregistrations: &[Deregistration]) -> DbResult<()>;
 
     /// Register an operator in the database.
     async fn register_operator(&self, operator: Operator) -> DbResult<()>;
 
-    /// Get an operator from the database.
-    async fn get_operator(&self, signer: Address) -> DbResult<Operator>;
+    /// List all registrations in the database.
+    async fn list_registrations(&self) -> DbResult<Vec<Registration>>;
 
-    /// Get a validator registration from the database.
-    async fn get_validator_registration(&self, pubkey: BlsPublicKey) -> DbResult<Registration>;
+    /// Get a batch of registrations from the database, by their public keys.
+    async fn get_registrations_by_pubkey(
+        &self,
+        pubkeys: &[BlsPublicKey],
+    ) -> DbResult<Vec<Registration>>;
+
+    /// List all validators in the database.
+    async fn list_validators(&self) -> DbResult<Vec<RegistryEntry>>;
+
+    /// Get a batch of validators from the database, by their public keys..
+    async fn get_validators_by_pubkey(
+        &self,
+        pubkeys: &[BlsPublicKey],
+    ) -> DbResult<Vec<RegistryEntry>>;
+
+    /// Get a batch of validators from the database, by their beacon chain indices.
+    async fn get_validators_by_index(&self, indices: Vec<usize>) -> DbResult<Vec<RegistryEntry>>;
+
+    /// List all operators in the database.
+    async fn list_operators(&self) -> DbResult<Vec<Operator>>;
+
+    /// Get a batch of operators from the database, by their signer addresses.
+    async fn get_operators_by_signer(&self, signers: &[Address]) -> DbResult<Vec<Operator>>;
 }
