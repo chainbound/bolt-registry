@@ -203,8 +203,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use crate::{db::InMemoryDb, primitives::registry::RegistryEntry, sources::mock::MockSource};
 
     use super::*;
