@@ -12,6 +12,7 @@ use crate::{
         registry::{DeregistrationBatch, Operator, Registration, RegistrationBatch, RegistryEntry},
         BlsPublicKey,
     },
+    sources::kapi::KeysApi,
     sync::{SyncHandle, Syncer},
 };
 
@@ -26,9 +27,18 @@ pub(crate) struct Registry<Db> {
     sync: SyncHandle,
 }
 
-impl<Db: RegistryDb> Registry<Db> {
+impl<Db> Registry<Db>
+where
+    Db: RegistryDb + Send + Clone + 'static,
+{
     pub(crate) fn new(config: Config, db: Db, beacon: BeaconClient) -> Self {
-        let (syncer, handle) = Syncer::new(&config.beacon_url, db.clone());
+        let kapi = KeysApi::new(&config.keys_api_url);
+        // TODO: add health check for the keys API before proceeding
+
+        let (mut syncer, handle) = Syncer::new(&config.beacon_url, db.clone());
+
+        // Set source
+        syncer.set_source(kapi);
 
         let _sync_task = syncer.spawn();
 

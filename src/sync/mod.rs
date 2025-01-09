@@ -14,7 +14,7 @@ use tracing::{error, info};
 use crate::{
     db::RegistryDb,
     primitives::{registry::Registration, BlsPublicKey},
-    sources::kapi::KeysApi,
+    sources::ExternalSource,
 };
 
 mod chain;
@@ -60,8 +60,11 @@ pub(crate) struct Syncer<Db> {
     state: watch::Sender<SyncState>,
     beacon_client: BeaconClient,
 
-    /// Lido keys API.
-    keys_api: KeysApi,
+    /// External data source.
+    /// NOTE: We use dynamic dispatch because when we have multiple data sources, we don't want to
+    /// have to change the `Syncer` struct every time we add a new source. This will all sit in a
+    /// vector of sources.
+    source: Option<Box<dyn ExternalSource + Send + Sync>>,
 
     /// The last known block number. Whenever a new epoch transition occurs, sync contract events
     /// from this block number to the new block number.
@@ -73,22 +76,21 @@ where
     Db: RegistryDb + Send + 'static,
 {
     /// Creates a new syncer with the given beacon and keys API URLs, and the database handle.
-    pub(crate) fn new(
-        beacon_url: impl IntoUrl,
-        keys_api: impl IntoUrl,
-        db: Db,
-    ) -> (Self, SyncHandle) {
+    pub(crate) fn new(beacon_url: impl IntoUrl, db: Db) -> (Self, SyncHandle) {
         let (state_tx, state_rx) = watch::channel(SyncState::Synced);
         let handle = SyncHandle { state: state_rx };
 
         let beacon_client = BeaconClient::new(beacon_url);
-        let kapi = KeysApi::new(keys_api);
 
         // TODO: read the last block number from the database and use as checkpoint for backfill
         let syncer =
-            Self { db, state: state_tx, beacon_client, keys_api: kapi, last_block_number: 0 };
+            Self { db, state: state_tx, beacon_client, source: None, last_block_number: 0 };
 
         (syncer, handle)
+    }
+
+    pub(crate) fn set_source<S: ExternalSource + Send + Sync + 'static>(&mut self, source: S) {
+        self.source = Some(Box::new(source));
     }
 
     /// Spawns the [`Syncer`] actor task.
@@ -155,8 +157,14 @@ where
             .collect::<Vec<_>>();
 
         let start = std::time::Instant::now();
+
+        let Some(source) = self.source.as_ref() else {
+            error!("No external source configured, skipping...");
+            return;
+        };
+
         let entries = loop {
-            match self.keys_api.get_validators(&pubkeys).await {
+            match source.get_validators(&pubkeys).await {
                 Ok(registrations) => break registrations,
                 Err(e) => {
                     error!(error = ?e, "Failed to get validators from keys API, retrying...");
@@ -165,7 +173,7 @@ where
             }
         };
 
-        info!(count = entries.len(), elapsed = ?start.elapsed(), "Queried entries from keys API");
+        info!(count = entries.len(), elapsed = ?start.elapsed(), "Queried entries from {}", source.name());
 
         // Extract unique registrations, keyed by operator address
         let mut registrations: HashMap<Address, Registration> = HashMap::new();
