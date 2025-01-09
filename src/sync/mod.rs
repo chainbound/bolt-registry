@@ -137,14 +137,15 @@ where
         self.sync_lookahead(lookahead).await;
 
         info!(elapsed = ?start.elapsed(), "Transition handled");
+        let _ = self.state.send(SyncState::Synced);
     }
 
     /// Syncs contract events from the last known block number to the given block number.
     async fn sync_contract_events(&mut self, block_number: u64) {
+        // TODO:
         // 1. Get contract logs from self.last_block_number to block_number
         // 2. Sync to database
         // 3. Update last_block_number = block_number
-        todo!()
     }
 
     /// Syncs the lookahead with external data sources.
@@ -159,7 +160,7 @@ where
         let start = std::time::Instant::now();
 
         let Some(source) = self.source.as_ref() else {
-            error!("No external source configured, skipping...");
+            info!("No external source configured, skipping...");
             return;
         };
 
@@ -197,5 +198,62 @@ where
                 error!(error = ?e, "Failed to register validators in the database");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crate::{db::InMemoryDb, primitives::registry::RegistryEntry, sources::mock::MockSource};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_external_source_sync() -> eyre::Result<()> {
+        let _ = tracing_subscriber::fmt().with_max_level(tracing::Level::INFO).try_init();
+
+        let Ok(beacon_url) = std::env::var("BEACON_URL") else {
+            tracing::warn!("Skipping test because of missing BEACON_URL");
+            return Ok(())
+        };
+
+        let db = InMemoryDb::default();
+        let (mut syncer, mut handle) = Syncer::new(beacon_url, db.clone());
+
+        let mut source = MockSource::new();
+
+        // Get current epoch and lookahead
+        let epoch = syncer.beacon_client.get_epoch().await?;
+        let lookahead = syncer.beacon_client.get_lookahead(epoch, true).await?;
+
+        let pubkey = lookahead.first().unwrap().public_key.clone();
+        let pubkey = BlsPublicKey::from_bytes(&pubkey).unwrap();
+
+        let operator = Address::default();
+
+        for duty in lookahead {
+            let entry = RegistryEntry {
+                validator_pubkey: BlsPublicKey::from_bytes(&duty.public_key).unwrap(),
+                operator,
+                gas_limit: 0,
+                rpc_endpoint: "https://rick.com".parse().unwrap(),
+            };
+
+            source.add_entry(entry);
+        }
+
+        syncer.set_source(source);
+        syncer.spawn();
+
+        // Wait for state to change to `Syncing`
+        handle.state.changed().await.unwrap();
+        // Wait for syncing to complete
+        handle.wait_for_sync().await;
+
+        // Check validator registration
+        assert!(db.get_validator_registration(pubkey.clone()).await?.is_some());
+
+        Ok(())
     }
 }

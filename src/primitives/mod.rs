@@ -1,3 +1,4 @@
+use alloy::primitives::FixedBytes;
 use derive_more::derive::{Deref, DerefMut, From};
 use serde::{Deserialize, Serialize};
 
@@ -20,4 +21,4 @@ impl BlsPublicKey {
 
 pub(crate) type BlsSignature = bls::Signature;
 
-pub(crate) type Digest = [u8; 32];
+pub(crate) type Digest = FixedBytes<32>;

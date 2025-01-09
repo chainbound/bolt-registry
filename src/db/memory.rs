@@ -5,7 +5,7 @@ use tracing::info;
 
 use super::{BlsPublicKey, DbResult, Operator, Registration, RegistryDb};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct InMemoryDb {
     validator_registrations: Arc<RwLock<Vec<Registration>>>,
     operator_registrations: Arc<RwLock<Vec<Operator>>>,
@@ -18,7 +18,7 @@ impl RegistryDb for InMemoryDb {
             keys_count = registration.validator_pubkeys.len(),
             sig_count = registration.signatures.len(),
             digest = ?registration.digest(),
-            "NoOpDb: register_validators"
+            "InMemoryDb: register_validators"
         );
 
         let mut registrations = self.validator_registrations.write().unwrap();
@@ -28,7 +28,7 @@ impl RegistryDb for InMemoryDb {
     }
 
     async fn register_operator(&self, operator: Operator) -> DbResult<()> {
-        info!(signer = %operator.signer, "NoOpDb: register_operator");
+        info!(signer = %operator.signer, "InMemoryDb: register_operator");
 
         let mut operators = self.operator_registrations.write().unwrap();
         operators.push(operator);

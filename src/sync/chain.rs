@@ -99,6 +99,19 @@ impl BeaconClient {
             };
         }
     }
+
+    /// Gets the current epoch from the sync status `head_slot`.
+    pub(super) async fn get_epoch(&self) -> Result<u64, Error> {
+        loop {
+            match self.client.get_sync_status().await {
+                Ok(status) => break Ok(status.head_slot / 32),
+                Err(e) => {
+                    warn!(error = ?e, "Failed to get epoch, retrying...");
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                }
+            }
+        }
+    }
 }
 
 /// An epoch transition event. Originates from the payload attribute stream, when the

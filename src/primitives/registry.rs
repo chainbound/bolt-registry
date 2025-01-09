@@ -34,7 +34,8 @@ impl RegistrationBatch {
         hasher.update(self.gas_limit.to_be_bytes());
         hasher.update(self.expiry.to_be_bytes());
 
-        hasher.finalize().into()
+        let arr: [u8; 32] = hasher.finalize().into();
+        arr.into()
     }
 
     /// Consumes the batch and returns the individual registrations.
