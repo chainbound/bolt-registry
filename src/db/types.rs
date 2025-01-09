@@ -45,6 +45,7 @@ impl TryFrom<OperatorRow> for Operator {
 #[derive(sqlx::FromRow, Debug)]
 pub(crate) struct ValidatorRegistrationRow {
     pub pubkey: Vec<u8>,                    // BYTEA
+    pub index: i64,                         // BIGINT
     pub signature: Vec<u8>,                 // BYTEA
     pub expiry: i64,                        // BIGINT
     pub gas_limit: i64,                     // BIGINT
@@ -61,6 +62,7 @@ impl TryFrom<ValidatorRegistrationRow> for Registration {
     fn try_from(value: ValidatorRegistrationRow) -> Result<Self, Self::Error> {
         Ok(Self {
             validator_pubkey: parse_pubkey(&value.pubkey)?,
+            validator_index: value.index as u64,
             signature: parse_signature(&value.signature)?,
             operator: parse_address(&value.operator)?,
             gas_limit: value.gas_limit as u64,

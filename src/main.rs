@@ -1,10 +1,13 @@
 //! Entrypoint.
 
+use client::BeaconClient;
 use tokio_stream::StreamExt;
 use tracing::{error, info};
 
 mod api;
 use api::{actions::Action, spec::RegistryError, ApiConfig, RegistryApi};
+
+mod client;
 
 mod db;
 use db::SQLDb;
@@ -13,6 +16,7 @@ mod primitives;
 
 mod registry;
 use registry::Registry;
+use url::Url;
 
 mod sources;
 
@@ -29,7 +33,9 @@ async fn main() -> eyre::Result<()> {
     let config = cli::Opts::parse_config()?;
 
     let db = SQLDb::new(&config.db_url).await?;
-    let mut registry = Registry::new(config, db);
+    let beacon = BeaconClient::new(Url::parse(&config.beacon_url)?);
+
+    let mut registry = Registry::new(config, db, beacon);
 
     let (srv, mut actions) = RegistryApi::new(ApiConfig::default());
 

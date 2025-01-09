@@ -32,6 +32,7 @@ impl RegistryDb for NoOpDb {
     ) -> DbResult<Vec<Registration>> {
         Ok(vec![Registration {
             validator_pubkey: pubkeys.first().unwrap().clone(),
+            validator_index: 0,
             operator: Address::random(),
             gas_limit: 0,
             expiry: 0,

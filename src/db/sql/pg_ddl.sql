@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS operators (
 -- Create the validator_registrations table if it does not exist
 CREATE TABLE IF NOT EXISTS validator_registrations (
     pubkey BYTEA PRIMARY KEY,                              -- BLS public key of the validator
+    index BIGINT NOT NULL,                                 -- Index of the validator in the beacon chain
     signature BYTEA NOT NULL,                              -- Signature of the registration
     expiry BIGINT NOT NULL,                                -- Expiry timestamp of the registration
     gas_limit BIGINT NOT NULL,                             -- Gas limit for the validator

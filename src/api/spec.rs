@@ -8,9 +8,13 @@ use thiserror::Error;
 use tokio::sync::{mpsc::error::SendTimeoutError, oneshot::error::RecvError};
 
 use super::{actions::Action, DeregistrationBatch, RegistrationBatch};
-use crate::primitives::{
-    registry::{Lookahead, Operator, Registration, RegistryEntry},
-    BlsPublicKey,
+use crate::{
+    client::beacon::BeaconClientError,
+    db::DbError,
+    primitives::{
+        registry::{Lookahead, Operator, Registration, RegistryEntry},
+        BlsPublicKey,
+    },
 };
 
 // validator endpoints
@@ -80,7 +84,11 @@ pub(crate) enum RegistryError {
     #[error("404 Not Found")]
     NotFound,
     #[error("Internal Server Error")]
-    Database(#[from] crate::db::DbError),
+    Database(#[from] DbError),
+    #[error("Internal Server Error")]
+    Beacon(#[from] BeaconClientError),
+    #[error("Bad Request: {0}")]
+    BadRequest(&'static str),
 }
 
 impl IntoResponse for RegistryError {
