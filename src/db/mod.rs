@@ -12,8 +12,8 @@ use crate::primitives::{
 mod types;
 
 /// No-op database implementation.
-mod noop;
-pub(crate) use noop::NoOpDb;
+mod memory;
+pub(crate) use memory::InMemoryDb;
 
 /// SQL database backend implementation.
 mod sql;
