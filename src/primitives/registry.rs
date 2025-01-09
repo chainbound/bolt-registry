@@ -38,16 +38,22 @@ impl RegistrationBatch {
     }
 
     /// Consumes the batch and returns the individual registrations.
-    pub(crate) fn into_items(self) -> Vec<Registration> {
+    /// Also requires a map of validator public keys to their indices in the beacon chain.
+    ///
+    /// Note: if a validator index is not found in the map, the registration is skipped.
+    pub(crate) fn into_items(self, index_map: HashMap<BlsPublicKey, usize>) -> Vec<Registration> {
         self.validator_pubkeys
             .into_iter()
             .zip(self.signatures)
-            .map(|(validator_pubkey, signature)| Registration {
-                validator_pubkey,
-                operator: self.operator,
-                gas_limit: self.gas_limit,
-                expiry: self.expiry,
-                signature,
+            .filter_map(|(validator_pubkey, signature)| {
+                Some(Registration {
+                    validator_index: *index_map.get(&validator_pubkey)? as u64,
+                    validator_pubkey,
+                    operator: self.operator,
+                    gas_limit: self.gas_limit,
+                    expiry: self.expiry,
+                    signature,
+                })
             })
             .collect()
     }
@@ -58,6 +64,8 @@ impl RegistrationBatch {
 pub(crate) struct Registration {
     /// Validator being registered.
     pub(crate) validator_pubkey: BlsPublicKey,
+    /// Index of the validator in the beacon chain.
+    pub(crate) validator_index: u64,
     /// Operator that can sign commitments on behalf of the validator.
     pub(crate) operator: Address,
     /// Gas limit reserved for commitments.
