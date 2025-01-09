@@ -105,11 +105,24 @@ impl RegistryDb for SQLDb<Postgres> {
         Ok(())
     }
 
-    async fn get_registrations(
+    async fn list_registrations(&self) -> DbResult<Vec<Registration>> {
+        let rows: Vec<ValidatorRegistrationRow> = sqlx::query_as(
+            "
+            SELECT pubkey, signature, expiry, gas_limit, operator, priority, source, last_update
+            FROM validator_registrations
+            ",
+        )
+        .fetch_all(&self.conn)
+        .await?;
+
+        rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn get_registrations_by_pubkey(
         &self,
-        pubkeys: Option<&[BlsPublicKey]>,
+        pubkeys: &[BlsPublicKey],
     ) -> DbResult<Vec<Registration>> {
-        let rows: Vec<ValidatorRegistrationRow> = if let Some(pubkeys) = pubkeys {
+        let rows: Vec<ValidatorRegistrationRow> = 
             sqlx::query_as(
                     "
                     SELECT pubkey, signature, expiry, gas_limit, operator, priority, source, last_update
@@ -119,27 +132,29 @@ impl RegistryDb for SQLDb<Postgres> {
                 )
                 .bind(pubkeys.iter().map(|p| p.serialize()).collect::<Vec<_>>())
                 .fetch_all(&self.conn)
-                .await?
-        } else {
-            // fetch all registrations if no pubkeys are provided
-            sqlx::query_as(
-                    "
-                    SELECT pubkey, signature, expiry, gas_limit, operator, priority, source, last_update
-                    FROM validator_registrations
-                    ",
-                )
-                .fetch_all(&self.conn)
-                .await?
-        };
+                .await?;
 
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
-    async fn get_validators(
+    async fn list_validators(&self) -> DbResult<Vec<RegistryEntry>> {
+        let rows: Vec<ValidatorRegistrationRow> = sqlx::query_as(
+            "
+            SELECT vr.pubkey, vr.signature, vr.expiry, vr.gas_limit, vr.operator, vr.priority, vr.source, vr.last_update, o.rpc
+            FROM validator_registrations vr LEFT JOIN operators o ON o.signer = vr.operator
+            ",
+        )
+        .fetch_all(&self.conn)
+        .await?;
+
+        rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn get_validators_by_pubkey(
         &self,
-        pubkeys: Option<&[BlsPublicKey]>,
+        pubkeys: &[BlsPublicKey],
     ) -> DbResult<Vec<RegistryEntry>> {
-        let rows: Vec<ValidatorRegistrationRow> = if let Some(pubkeys) = pubkeys {
+        let rows: Vec<ValidatorRegistrationRow> = 
             sqlx::query_as(
                 "
                 SELECT vr.pubkey, vr.signature, vr.expiry, vr.gas_limit, vr.operator, vr.priority, vr.source, vr.last_update, o.rpc
@@ -149,18 +164,8 @@ impl RegistryDb for SQLDb<Postgres> {
             )
             .bind(pubkeys.iter().map(|p| p.serialize()).collect::<Vec<_>>())
             .fetch_all(&self.conn)
-            .await?
-        } else {
-            // fetch all validators if no pubkeys are provided
-            sqlx::query_as(
-                "
-                SELECT vr.pubkey, vr.signature, vr.expiry, vr.gas_limit, vr.operator, vr.priority, vr.source, vr.last_update, o.rpc
-                FROM validator_registrations vr LEFT JOIN operators o ON o.signer = vr.operator
-                ",
-            )
-            .fetch_all(&self.conn)
-            .await?
-        };
+            .await?;
+        
 
         rows.into_iter().map(TryInto::try_into).collect()
     }

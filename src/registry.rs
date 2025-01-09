@@ -63,7 +63,10 @@ impl<Db: RegistryDb> Registry<Db> {
         pubkeys: Option<&[BlsPublicKey]>,
     ) -> Result<Vec<Registration>, RegistryError> {
         self.sync.wait_for_sync().await;
-        Ok(self.db.get_registrations(pubkeys).await?)
+        match pubkeys {
+            Some(pubkeys) => Ok(self.db.get_registrations_by_pubkey(pubkeys).await?),
+            None => Ok(self.db.list_registrations().await?),
+        }
     }
 
     pub(crate) async fn get_validators(
@@ -71,7 +74,10 @@ impl<Db: RegistryDb> Registry<Db> {
         pubkeys: Option<&[BlsPublicKey]>,
     ) -> Result<Vec<RegistryEntry>, RegistryError> {
         self.sync.wait_for_sync().await;
-        Ok(self.db.get_validators(pubkeys).await?)
+        match pubkeys {
+            Some(pubkeys) => Ok(self.db.get_validators_by_pubkey(pubkeys).await?),
+            None => Ok(self.db.list_validators().await?),
+        }
     }
 
     pub(crate) async fn get_operators(

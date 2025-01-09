@@ -50,20 +50,22 @@ pub(crate) trait RegistryDb: Clone {
     /// Register an operator in the database.
     async fn register_operator(&self, operator: Operator) -> DbResult<()>;
 
+    /// List all registrations in the database.
+    async fn list_registrations(&self) -> DbResult<Vec<Registration>>;
+
     /// Get a batch of registrations from the database, by their public keys.
-    ///
-    /// If no public keys are provided, return all registrations in the registry.
-    async fn get_registrations(
+    async fn get_registrations_by_pubkey(
         &self,
-        pubkeys: Option<&[BlsPublicKey]>,
+        pubkeys: &[BlsPublicKey],
     ) -> DbResult<Vec<Registration>>;
 
-    /// Get a batch of validators from the database, by their public keys.
-    ///
-    /// If no public keys are provided, return all validators in the registry.
-    async fn get_validators(
+    /// List all validators in the database.
+    async fn list_validators(&self) -> DbResult<Vec<RegistryEntry>>;
+
+    /// Get a batch of validators from the database, by their public keys..
+    async fn get_validators_by_pubkey(
         &self,
-        pubkeys: Option<&[BlsPublicKey]>,
+        pubkeys: &[BlsPublicKey],
     ) -> DbResult<Vec<RegistryEntry>>;
 
     /// Get a batch of operators from the database, by their addresses.

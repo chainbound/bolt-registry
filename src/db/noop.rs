@@ -22,12 +22,16 @@ impl RegistryDb for NoOpDb {
         Ok(())
     }
 
-    async fn get_registrations(
+    async fn list_registrations(&self) -> DbResult<Vec<Registration>> {
+        Ok(vec![])
+    }
+
+    async fn get_registrations_by_pubkey(
         &self,
-        pubkeys: Option<&[BlsPublicKey]>,
+        pubkeys: &[BlsPublicKey],
     ) -> DbResult<Vec<Registration>> {
         Ok(vec![Registration {
-            validator_pubkey: pubkeys.unwrap().first().unwrap().clone(),
+            validator_pubkey: pubkeys.first().unwrap().clone(),
             operator: Address::random(),
             gas_limit: 0,
             expiry: 0,
@@ -35,12 +39,16 @@ impl RegistryDb for NoOpDb {
         }])
     }
 
-    async fn get_validators(
+    async fn list_validators(&self) -> DbResult<Vec<RegistryEntry>> {
+        Ok(vec![])
+    }
+
+    async fn get_validators_by_pubkey(
         &self,
-        pubkeys: Option<&[BlsPublicKey]>,
+        pubkeys: &[BlsPublicKey],
     ) -> DbResult<Vec<RegistryEntry>> {
         Ok(vec![RegistryEntry {
-            validator_pubkey: pubkeys.unwrap().first().unwrap().clone(),
+            validator_pubkey: pubkeys.first().unwrap().clone(),
             operator: Address::random(),
             gas_limit: 0,
             rpc_endpoint: "https://grugbrain.dev".parse()?,
