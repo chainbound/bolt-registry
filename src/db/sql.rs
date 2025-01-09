@@ -171,7 +171,7 @@ impl RegistryDb for SQLDb<Postgres> {
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
-    async fn get_validators_by_index(&self, indices: Vec<usize>) -> DbResult<Vec<RegistryEntry>> {
+    async fn get_validators_by_index(&self, indices: Vec<u64>) -> DbResult<Vec<RegistryEntry>> {
         let rows: Vec<ValidatorRegistrationRow> =
             sqlx::query_as(
                 "

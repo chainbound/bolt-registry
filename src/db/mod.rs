@@ -12,8 +12,7 @@ use crate::primitives::{
 mod types;
 
 /// No-op database implementation.
-mod memory;
-pub(crate) use memory::InMemoryDb;
+pub(crate) mod memory;
 
 /// SQL database backend implementation.
 mod sql;
@@ -71,7 +70,7 @@ pub(crate) trait RegistryDb: Clone {
     ) -> DbResult<Vec<RegistryEntry>>;
 
     /// Get a batch of validators from the database, by their beacon chain indices.
-    async fn get_validators_by_index(&self, indices: Vec<usize>) -> DbResult<Vec<RegistryEntry>>;
+    async fn get_validators_by_index(&self, indices: Vec<u64>) -> DbResult<Vec<RegistryEntry>>;
 
     /// List all operators in the database.
     async fn list_operators(&self) -> DbResult<Vec<Operator>>;
