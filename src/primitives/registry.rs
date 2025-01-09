@@ -42,18 +42,18 @@ impl RegistrationBatch {
     /// Also requires a map of validator public keys to their indices in the beacon chain.
     ///
     /// Note: if a validator index is not found in the map, the registration is skipped.
-    pub(crate) fn into_items(self, index_map: HashMap<BlsPublicKey, usize>) -> Vec<Registration> {
+    pub(crate) fn into_items(self, index_map: HashMap<BlsPublicKey, u64>) -> Vec<Registration> {
         self.validator_pubkeys
             .into_iter()
             .zip(self.signatures)
             .filter_map(|(validator_pubkey, signature)| {
                 Some(Registration {
-                    validator_index: *index_map.get(&validator_pubkey)? as u64,
+                    validator_index: *index_map.get(&validator_pubkey)?,
                     validator_pubkey,
                     operator: self.operator,
                     gas_limit: self.gas_limit,
                     expiry: self.expiry,
-                    signature,
+                    signature: Some(signature),
                 })
             })
             .collect()
@@ -74,7 +74,7 @@ pub(crate) struct Registration {
     /// The expiry of the registration.
     pub(crate) expiry: u64,
     /// The BLS signature of the validator on the registration.
-    pub(crate) signature: BlsSignature,
+    pub(crate) signature: Option<BlsSignature>,
 }
 
 /// A batch deregistration of validators.

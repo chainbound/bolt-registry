@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use beacon_client::{
+use beacon_api_client::{
     mainnet::MainnetClientTypes, Client, Error, PayloadAttributesTopic, ProposerDuty,
 };
 use reqwest::IntoUrl;

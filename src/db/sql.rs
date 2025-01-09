@@ -59,7 +59,7 @@ impl RegistryDb for SQLDb<Postgres> {
             )
             .bind(registration.validator_pubkey.serialize())
             .bind(registration.validator_index as i64)
-            .bind(registration.signature.serialize())
+            .bind(registration.signature.as_ref().map(|s| s.serialize()))
             .bind(registration.expiry.to_string())
             .bind(registration.operator.to_vec())
             .bind(0) // TODO: priority

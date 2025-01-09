@@ -31,7 +31,7 @@ use crate::primitives::{
 pub(crate) mod actions;
 use actions::{Action, ActionStream};
 
-mod spec;
+pub(crate) mod spec;
 use spec::{
     DiscoverySpec, ValidatorSpec, DISCOVERY_LOOKAHEAD_PATH, DISCOVERY_OPERATORS_PATH,
     DISCOVERY_OPERATOR_PATH, DISCOVERY_VALIDATORS_PATH, DISCOVERY_VALIDATOR_PATH,

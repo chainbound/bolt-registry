@@ -2,8 +2,7 @@
 //! data providers.
 use std::collections::HashMap;
 
-use alloy::primitives::Address;
-use beacon_client::ProposerDuty;
+use beacon_api_client::ProposerDuty;
 use chain::{BeaconClient, EpochTransition, EpochTransitionStream};
 use reqwest::IntoUrl;
 use thiserror::Error;
@@ -13,7 +12,10 @@ use tracing::{error, info};
 
 use crate::{
     db::RegistryDb,
-    primitives::{registry::Registration, BlsPublicKey},
+    primitives::{
+        registry::{Operator, Registration},
+        BlsPublicKey,
+    },
     sources::ExternalSource,
 };
 
@@ -176,33 +178,44 @@ where
 
         info!(count = entries.len(), elapsed = ?start.elapsed(), "Queried entries from {}", source.name());
 
-        // Extract unique registrations, keyed by operator address
-        let mut registrations: HashMap<Address, Registration> = HashMap::new();
+        let mut operators = HashMap::new();
+        let registrations = entries
+            .into_iter()
+            .map(|entry| {
+                let operator = Operator {
+                    signer: entry.operator,
+                    rpc_endpoint: entry.rpc_endpoint,
+                    collateral_tokens: vec![],
+                    collateral_amounts: vec![],
+                };
 
-        for entry in entries {
-            registrations
-                .entry(entry.operator)
-                .and_modify(|r| r.validator_pubkeys.push(entry.validator_pubkey.clone()))
-                .or_insert(Registration {
-                    validator_pubkeys: vec![entry.validator_pubkey.clone()],
+                operators.insert(entry.operator, operator);
+
+                let validator_index =
+                    todo!("Get validator index from the beacon chain OR from keys-API?");
+
+                Registration {
+                    validator_pubkey: entry.validator_pubkey,
                     operator: entry.operator,
-                    gas_limit: entry.gas_limit,
+                    gas_limit: 10_000,
                     expiry: 0,
-                    signatures: vec![],
-                });
-        }
+                    validator_index,
+                    signature: None,
+                }
+            })
+            .collect::<Vec<_>>();
 
-        for registration in registrations.into_values() {
-            // TODO: retries on transient faults (e.g. network errors)
-            if let Err(e) = self.db.register_validators(registration).await {
-                error!(error = ?e, "Failed to register validators in the database");
-            }
+        // TODO: retries on transient faults (e.g. network errors)
+        if let Err(e) = self.db.register_validators(&registrations).await {
+            error!(error = ?e, "Failed to register validators in the database");
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use alloy::primitives::Address;
+
     use crate::{db::InMemoryDb, primitives::registry::RegistryEntry, sources::mock::MockSource};
 
     use super::*;
@@ -250,7 +263,7 @@ mod tests {
         handle.wait_for_sync().await;
 
         // Check validator registration
-        assert!(db.get_validator_registration(pubkey.clone()).await?.is_some());
+        assert!(!db.get_validators_by_pubkey(&[pubkey.clone()]).await?.is_empty());
 
         Ok(())
     }

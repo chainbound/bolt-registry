@@ -59,7 +59,12 @@ where
         // 2. collect a map of validator public keys to their indices
         let index_map = validators
             .into_iter()
-            .map(|v| (BlsPublicKey::from_consensus(v.validator.public_key), v.index))
+            .map(|v| {
+                (
+                    BlsPublicKey::from_bytes(&v.validator.public_key).expect("valid BLS pubkey"),
+                    v.index as u64,
+                )
+            })
             .collect::<HashMap<_, _>>();
 
         // 3. check that all validators are present
@@ -121,7 +126,7 @@ where
 
     pub(crate) async fn get_validators_by_index(
         &mut self,
-        indices: Vec<usize>,
+        indices: Vec<u64>,
     ) -> Result<Vec<RegistryEntry>, RegistryError> {
         self.sync.wait_for_sync().await;
         Ok(self.db.get_validators_by_index(indices).await?)

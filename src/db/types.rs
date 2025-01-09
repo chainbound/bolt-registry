@@ -46,7 +46,7 @@ impl TryFrom<OperatorRow> for Operator {
 pub(crate) struct ValidatorRegistrationRow {
     pub pubkey: Vec<u8>,                    // BYTEA
     pub index: i64,                         // BIGINT
-    pub signature: Vec<u8>,                 // BYTEA
+    pub signature: Option<Vec<u8>>,         // BYTEA
     pub expiry: i64,                        // BIGINT
     pub gas_limit: i64,                     // BIGINT
     pub operator: Vec<u8>,                  // BYTEA
@@ -63,7 +63,7 @@ impl TryFrom<ValidatorRegistrationRow> for Registration {
         Ok(Self {
             validator_pubkey: parse_pubkey(&value.pubkey)?,
             validator_index: value.index as u64,
-            signature: parse_signature(&value.signature)?,
+            signature: parse_signature(value.signature.as_ref()),
             operator: parse_address(&value.operator)?,
             gas_limit: value.gas_limit as u64,
             expiry: value.expiry as u64,
@@ -102,6 +102,6 @@ fn parse_pubkey(value: &[u8]) -> Result<BlsPublicKey, DbError> {
 }
 
 /// Utility function to parse a BLS signature from a byte array.
-fn parse_signature(value: &[u8]) -> Result<BlsSignature, DbError> {
-    bls::Signature::deserialize(value).map_err(DbError::ParseBLSKey)
+fn parse_signature(value: Option<impl AsRef<[u8]>>) -> Option<BlsSignature> {
+    value.map(|v| BlsSignature::deserialize(v.as_ref()).ok()).flatten()
 }
