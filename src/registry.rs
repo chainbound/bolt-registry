@@ -35,7 +35,7 @@ where
         let kapi = KeysApi::new(&config.keys_api_url);
         // TODO: add health check for the keys API before proceeding
 
-        let (mut syncer, handle) = Syncer::new(&config.beacon_url, db.clone());
+        let (mut syncer, handle) = Syncer::new(config.beacon_url, db.clone());
 
         // Set source
         syncer.set_source(kapi);
