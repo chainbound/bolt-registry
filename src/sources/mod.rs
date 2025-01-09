@@ -7,6 +7,10 @@ use crate::primitives::{registry::RegistryEntry, BlsPublicKey};
 /// <https://github.com/lidofinance/lido-keys-api/tree/develop>
 pub(crate) mod kapi;
 
+/// Mock external source for testing.
+#[cfg(test)]
+pub(crate) mod mock;
+
 #[derive(Debug, Error)]
 pub(crate) enum SourceError {
     #[error(transparent)]
