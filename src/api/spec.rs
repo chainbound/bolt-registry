@@ -7,12 +7,15 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::{mpsc::error::SendTimeoutError, oneshot::error::RecvError};
 
-use super::{actions::Action, DeregistrationBatch, RegistrationBatch};
+use super::actions::Action;
 use crate::{
     client::beacon::BeaconClientError,
     db::DbError,
     primitives::{
-        registry::{Lookahead, Operator, Registration, RegistryEntry},
+        registry::{
+            DeregistrationBatch, Lookahead, Operator, Registration, RegistrationBatch,
+            RegistryEntry,
+        },
         BlsPublicKey,
     },
 };
@@ -55,7 +58,7 @@ pub(super) trait DiscoverySpec {
     /// /registry/v1/discovery/validators?indices=...
     async fn get_validators_by_indices(
         &self,
-        indices: Vec<usize>,
+        indices: Vec<u64>,
     ) -> Result<Vec<RegistryEntry>, RegistryError>;
 
     /// /registry/v1/discovery/validators/{pubkey}

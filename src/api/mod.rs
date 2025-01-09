@@ -1,5 +1,5 @@
 //! Module `api` contains the API server for the registry. The API server is defined in
-//! [`spec::ValidatorSpec`] and [`spec::DiscoverySpec`], and is implemented by [`RegistryApi`].
+//! [`spec::ApiSpec`];
 
 use std::{io, net::SocketAddr, sync::Arc, time::Duration};
 
@@ -31,7 +31,7 @@ use crate::primitives::{
 pub(crate) mod actions;
 use actions::{Action, ActionStream};
 
-pub(crate) mod spec;
+mod spec;
 use spec::{
     DiscoverySpec, ValidatorSpec, DISCOVERY_LOOKAHEAD_PATH, DISCOVERY_OPERATORS_PATH,
     DISCOVERY_OPERATOR_PATH, DISCOVERY_VALIDATORS_PATH, DISCOVERY_VALIDATOR_PATH,
@@ -69,7 +69,7 @@ impl Default for ApiConfig {
 #[derive(Deserialize, Default)]
 struct ValidatorFilter {
     pubkeys: Option<Vec<BlsPublicKey>>,
-    indices: Option<Vec<usize>>,
+    indices: Option<Vec<u64>>,
 }
 
 impl RegistryApi {
@@ -231,7 +231,7 @@ impl spec::DiscoverySpec for RegistryApi {
     #[tracing::instrument(skip(self))]
     async fn get_validators_by_indices(
         &self,
-        indices: Vec<usize>,
+        indices: Vec<u64>,
     ) -> Result<Vec<RegistryEntry>, spec::RegistryError> {
         let (tx, rx) = oneshot::channel();
 
@@ -292,8 +292,6 @@ impl spec::DiscoverySpec for RegistryApi {
 mod tests {
     use tokio_stream::StreamExt;
 
-    use crate::primitives::registry::RegistrationBatch;
-
     use super::*;
 
     #[tokio::test]
@@ -302,11 +300,15 @@ mod tests {
 
         let (api, mut stream) = RegistryApi::new(Default::default());
 
+        let operator = Address::random();
+        let gas_limit = 10_000u64;
+        let expiry = 0u64;
+
         let registration = RegistrationBatch {
             validator_pubkeys: vec![BlsPublicKey::random()],
-            operator: Address::random(),
-            gas_limit: 10_000,
-            expiry: 0,
+            operator,
+            gas_limit,
+            expiry,
             signatures: vec![],
         };
 

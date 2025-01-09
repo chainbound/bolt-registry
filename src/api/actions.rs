@@ -7,9 +7,11 @@ use alloy::primitives::Address;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::Stream;
 
-use super::{spec, DeregistrationBatch, RegistrationBatch};
+use super::spec;
 use crate::primitives::{
-    registry::{Lookahead, Operator, Registration, RegistryEntry},
+    registry::{
+        DeregistrationBatch, Lookahead, Operator, Registration, RegistrationBatch, RegistryEntry,
+    },
     BlsPublicKey,
 };
 
@@ -35,7 +37,7 @@ pub(crate) enum Action {
         response: oneshot::Sender<Result<Vec<RegistryEntry>, spec::RegistryError>>,
     },
     GetValidatorsByIndices {
-        indices: Vec<usize>,
+        indices: Vec<u64>,
         response: oneshot::Sender<Result<Vec<RegistryEntry>, spec::RegistryError>>,
     },
     GetValidatorByPubkey {
