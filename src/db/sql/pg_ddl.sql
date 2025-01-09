@@ -39,3 +39,10 @@ CREATE TABLE IF NOT EXISTS validator_registrations (
     source source_enum NOT NULL,                           -- Source of the registration data
     last_update TIMESTAMP NOT NULL                         -- Last time this record was updated
 );
+
+-- Create the sync_state table if it doesn't exist
+CREATE TABLE IF NOT EXISTS sync_state (
+    block_number BIGINT PRIMARY KEY,  -- Last synced block number
+    epoch BIGINT NOT NULL,            -- Last synced epoch
+    slot BIGINT NOT NULL,             -- Last synced slot
+);
