@@ -52,11 +52,12 @@ impl RegistryDb for SQLDb<Postgres> {
         for registration in registrations {
             sqlx::query(
                 "
-                INSERT INTO validator_registrations (pubkey, signature, expiry, operator, priority, source, last_update)
-                VALUES ($1, $2, $3, $4, $5, $6, NOW())
+                INSERT INTO validator_registrations (pubkey, index, signature, expiry, operator, priority, source, last_update)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
                 "
             )
             .bind(registration.validator_pubkey.serialize())
+            .bind(registration.index as i64)
             .bind(registration.signature.serialize())
             .bind(registration.expiry.to_string())
             .bind(registration.operator.to_vec())
@@ -108,7 +109,7 @@ impl RegistryDb for SQLDb<Postgres> {
     async fn list_registrations(&self) -> DbResult<Vec<Registration>> {
         let rows: Vec<ValidatorRegistrationRow> = sqlx::query_as(
             "
-            SELECT pubkey, signature, expiry, gas_limit, operator, priority, source, last_update
+            SELECT pubkey, index, signature, expiry, gas_limit, operator, priority, source, last_update
             FROM validator_registrations
             ",
         )
@@ -125,7 +126,7 @@ impl RegistryDb for SQLDb<Postgres> {
         let rows: Vec<ValidatorRegistrationRow> = 
             sqlx::query_as(
                     "
-                    SELECT pubkey, signature, expiry, gas_limit, operator, priority, source, last_update
+                    SELECT pubkey, index, signature, expiry, gas_limit, operator, priority, source, last_update
                     FROM validator_registrations
                     WHERE pubkey = ANY($1)
                     ",
@@ -140,7 +141,7 @@ impl RegistryDb for SQLDb<Postgres> {
     async fn list_validators(&self) -> DbResult<Vec<RegistryEntry>> {
         let rows: Vec<ValidatorRegistrationRow> = sqlx::query_as(
             "
-            SELECT vr.pubkey, vr.signature, vr.expiry, vr.gas_limit, vr.operator, vr.priority, vr.source, vr.last_update, o.rpc
+            SELECT vr.pubkey, vr.index, vr.signature, vr.expiry, vr.gas_limit, vr.operator, vr.priority, vr.source, vr.last_update, o.rpc
             FROM validator_registrations vr LEFT JOIN operators o ON o.signer = vr.operator
             ",
         )
@@ -157,7 +158,7 @@ impl RegistryDb for SQLDb<Postgres> {
         let rows: Vec<ValidatorRegistrationRow> = 
             sqlx::query_as(
                 "
-                SELECT vr.pubkey, vr.signature, vr.expiry, vr.gas_limit, vr.operator, vr.priority, vr.source, vr.last_update, o.rpc
+                SELECT vr.pubkey, vr.index, vr.signature, vr.expiry, vr.gas_limit, vr.operator, vr.priority, vr.source, vr.last_update, o.rpc
                 FROM validator_registrations vr LEFT JOIN operators o ON o.signer = vr.operator
                 WHERE vr.pubkey = ANY($1)
                 ",
@@ -170,8 +171,37 @@ impl RegistryDb for SQLDb<Postgres> {
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
-    async fn get_operators(&self, signers: Option<&[Address]>) -> DbResult<Vec<Operator>> {
-        let rows: Vec<OperatorRow> = if let Some(signers) = signers {
+    async fn get_validators_by_index(&self, indices: Vec<usize>) -> DbResult<Vec<RegistryEntry>> {
+        let rows: Vec<ValidatorRegistrationRow> = 
+            sqlx::query_as(
+                "
+                SELECT vr.pubkey, vr.index, vr.signature, vr.expiry, vr.gas_limit, vr.operator, vr.priority, vr.source, vr.last_update, o.rpc
+                FROM validator_registrations vr LEFT JOIN operators o ON o.signer = vr.operator
+                WHERE vr.index = ANY($1)
+                ",
+            )
+            .bind(indices.into_iter().map(|i| i as i64).collect::<Vec<_>>())
+            .fetch_all(&self.conn)
+            .await?;
+        
+        rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn list_operators(&self) -> DbResult<Vec<Operator>> {
+        let rows: Vec<OperatorRow> = sqlx::query_as(
+            "
+            SELECT signer, rpc, protocol, source, collateral_tokens, collateral_amounts, last_update
+            FROM operators
+            ",
+        )
+        .fetch_all(&self.conn)
+        .await?;
+
+        rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn get_operators_by_signer(&self, signers: &[Address]) -> DbResult<Vec<Operator>> {
+        let rows: Vec<OperatorRow> = 
             sqlx::query_as(
                 "
                 SELECT signer, rpc, protocol, source, collateral_tokens, collateral_amounts, last_update
@@ -181,19 +211,8 @@ impl RegistryDb for SQLDb<Postgres> {
             )
             .bind(signers.iter().map(|s| s.to_vec()).collect::<Vec<_>>())
             .fetch_all(&self.conn)
-            .await?
-        } else {
-            // fetch all operators if no signers are provided
-            sqlx::query_as(
-                "
-                SELECT signer, rpc, protocol, source, collateral_tokens, collateral_amounts, last_update
-                FROM operators
-                ",
-            )
-            .fetch_all(&self.conn)
-            .await?
-        };
-
+            .await?;
+        
         rows.into_iter().map(TryInto::try_into).collect()
     }
 }

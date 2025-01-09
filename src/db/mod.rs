@@ -68,8 +68,12 @@ pub(crate) trait RegistryDb: Clone {
         pubkeys: &[BlsPublicKey],
     ) -> DbResult<Vec<RegistryEntry>>;
 
-    /// Get a batch of operators from the database, by their addresses.
-    ///
-    /// If no addresses are provided, return all operators in the registry.
-    async fn get_operators(&self, signers: Option<&[Address]>) -> DbResult<Vec<Operator>>;
+    /// Get a batch of validators from the database, by their beacon chain indices.
+    async fn get_validators_by_index(&self, indices: Vec<usize>) -> DbResult<Vec<RegistryEntry>>;
+
+    /// List all operators in the database.
+    async fn list_operators(&self) -> DbResult<Vec<Operator>>;
+
+    /// Get a batch of operators from the database, by their signer addresses.
+    async fn get_operators_by_signer(&self, signers: &[Address]) -> DbResult<Vec<Operator>>;
 }

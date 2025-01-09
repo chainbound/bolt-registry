@@ -55,7 +55,15 @@ impl RegistryDb for NoOpDb {
         }])
     }
 
-    async fn get_operators(&self, _signers: Option<&[Address]>) -> DbResult<Vec<Operator>> {
+    async fn get_validators_by_index(&self, _indices: Vec<usize>) -> DbResult<Vec<RegistryEntry>> {
+        Ok(vec![])
+    }
+
+    async fn list_operators(&self) -> DbResult<Vec<Operator>> {
+        Ok(vec![])
+    }
+
+    async fn get_operators_by_signer(&self, _signers: &[Address]) -> DbResult<Vec<Operator>> {
         Ok(vec![])
     }
 }

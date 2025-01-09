@@ -58,33 +58,50 @@ impl<Db: RegistryDb> Registry<Db> {
         Ok(())
     }
 
-    pub(crate) async fn get_registrations(
+    pub(crate) async fn list_registrations(&mut self) -> Result<Vec<Registration>, RegistryError> {
+        self.sync.wait_for_sync().await;
+        Ok(self.db.list_registrations().await?)
+    }
+
+    pub(crate) async fn get_registrations_by_pubkey(
         &mut self,
-        pubkeys: Option<&[BlsPublicKey]>,
+        pubkeys: &[BlsPublicKey],
     ) -> Result<Vec<Registration>, RegistryError> {
         self.sync.wait_for_sync().await;
-        match pubkeys {
-            Some(pubkeys) => Ok(self.db.get_registrations_by_pubkey(pubkeys).await?),
-            None => Ok(self.db.list_registrations().await?),
-        }
+        Ok(self.db.get_registrations_by_pubkey(pubkeys).await?)
     }
 
-    pub(crate) async fn get_validators(
+    pub(crate) async fn list_validators(&mut self) -> Result<Vec<RegistryEntry>, RegistryError> {
+        self.sync.wait_for_sync().await;
+        Ok(self.db.list_validators().await?)
+    }
+
+    pub(crate) async fn get_validators_by_pubkey(
         &mut self,
-        pubkeys: Option<&[BlsPublicKey]>,
+        pubkeys: &[BlsPublicKey],
     ) -> Result<Vec<RegistryEntry>, RegistryError> {
         self.sync.wait_for_sync().await;
-        match pubkeys {
-            Some(pubkeys) => Ok(self.db.get_validators_by_pubkey(pubkeys).await?),
-            None => Ok(self.db.list_validators().await?),
-        }
+        Ok(self.db.get_validators_by_pubkey(pubkeys).await?)
     }
 
-    pub(crate) async fn get_operators(
+    pub(crate) async fn get_validators_by_index(
         &mut self,
-        signers: Option<&[Address]>,
+        indices: Vec<usize>,
+    ) -> Result<Vec<RegistryEntry>, RegistryError> {
+        self.sync.wait_for_sync().await;
+        Ok(self.db.get_validators_by_index(indices).await?)
+    }
+
+    pub(crate) async fn list_operators(&mut self) -> Result<Vec<Operator>, RegistryError> {
+        self.sync.wait_for_sync().await;
+        Ok(self.db.list_operators().await?)
+    }
+
+    pub(crate) async fn get_operators_by_signer(
+        &mut self,
+        signers: &[Address],
     ) -> Result<Vec<Operator>, RegistryError> {
         self.sync.wait_for_sync().await;
-        Ok(self.db.get_operators(signers).await?)
+        Ok(self.db.get_operators_by_signer(signers).await?)
     }
 }
