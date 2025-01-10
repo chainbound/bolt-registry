@@ -6,7 +6,7 @@ use alloy::primitives::Address;
 
 use crate::primitives::{
     registry::{Deregistration, Operator, Registration, RegistryEntry},
-    BlsPublicKey,
+    BlsPublicKey, SyncStateUpdate,
 };
 
 mod types;
@@ -78,4 +78,7 @@ pub(crate) trait RegistryDb: Clone {
 
     /// Get a batch of operators from the database, by their signer addresses.
     async fn get_operators_by_signer(&self, signers: &[Address]) -> DbResult<Vec<Operator>>;
+
+    /// Update the sync state in the database.
+    async fn update_sync_state(&self, state: SyncStateUpdate) -> DbResult<()>;
 }
