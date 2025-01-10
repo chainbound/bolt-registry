@@ -4,12 +4,19 @@ use alloy::{
     primitives::{Address, B256},
     rpc::types::Withdrawal,
 };
-use beacon_api_client::{BlockId, StateId, ValidatorStatus, ValidatorSummary};
+use beacon_api_client::{
+    BlockId, PayloadAttributesTopic, ProposerDuty, StateId, ValidatorStatus, ValidatorSummary,
+};
 use derive_more::derive::Deref;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
+use tokio_stream::{Stream, StreamExt};
+use tracing::warn;
 
-use crate::primitives::BlsPublicKey;
+use crate::primitives::{
+    beacon::{NewHead, NewHeadsTopic, PayloadAttribute},
+    BlsPublicKey,
+};
 
 /// Errors that can occur while interacting with the beacon API.
 #[derive(Debug, thiserror::Error)]
@@ -32,7 +39,7 @@ pub(crate) enum BeaconClientError {
 }
 
 /// A type alias for the result of a beacon client operation.
-pub type BeaconClientResult<T> = Result<T, BeaconClientError>;
+pub(crate) type BeaconClientResult<T> = Result<T, BeaconClientError>;
 
 /// The [`BeaconClient`] is responsible for fetching information from the beacon node.
 ///
@@ -114,6 +121,111 @@ impl BeaconClient {
     pub(crate) async fn get_parent_beacon_block_root(&self) -> BeaconClientResult<B256> {
         let res = self.inner.get_beacon_block_root(BlockId::Head).await?;
         Ok(B256::from_slice(res.as_slice()))
+    }
+
+    /// Subscribes to the payload attributes events. Returns a stream of filtered payload attributes
+    /// in the form of [`PayloadAttribute`]. These events are emitted by beacon nodes in 3 cases:
+    /// 1. Around the 12s mark.
+    /// 2. When a new head is processed.
+    /// 3. At a 4 seconds into a slot, without a new head.
+    ///
+    /// Note that multiple payload attribute events can be emitted for the same `proposal_slot`.
+    ///
+    /// # Retries
+    /// This method will retry indefinitely in case of a failure.
+    pub(crate) async fn subscribe_payload_attributes(
+        &self,
+    ) -> Result<impl Stream<Item = PayloadAttribute> + Send + Unpin, BeaconClientError> {
+        let events = loop {
+            match self.inner.get_events::<PayloadAttributesTopic>().await {
+                Ok(events) => break events,
+                Err(e) => {
+                    warn!(error = ?e, "Failed to subscribe to payload attributes, retrying...");
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
+            }
+        };
+
+        let stream = events.filter_map(|event| {
+            event
+                .map(|value| PayloadAttribute {
+                    proposal_slot: value.data.proposal_slot,
+                    parent_block_number: value.data.parent_block_number,
+                })
+                .ok()
+        });
+
+        Ok(stream)
+    }
+
+    /// Subscribes to new head events.
+    pub(crate) async fn subscribe_new_heads(
+        &self,
+    ) -> Result<impl Stream<Item = NewHead> + Send + Unpin, BeaconClientError> {
+        let events = loop {
+            match self.inner.get_events::<NewHeadsTopic>().await {
+                Ok(events) => break events,
+                Err(e) => {
+                    warn!(error = ?e, "Failed to subscribe to new heads, retrying...");
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
+            }
+        };
+
+        Ok(events.filter_map(|event| event.ok()))
+    }
+
+    /// Gets the lookahead for the given epoch. If `extended` is `true`, it will also fetch the
+    /// lookahead for the next epoch, which is considered unstable.
+    ///
+    /// # Retries
+    /// This method will retry indefinitely in case of a failure.
+    pub(crate) async fn get_lookahead(
+        &self,
+        epoch: u64,
+        extended: bool,
+    ) -> Result<Vec<ProposerDuty>, BeaconClientError> {
+        loop {
+            if extended {
+                match tokio::try_join!(
+                    self.inner.get_proposer_duties(epoch),
+                    self.inner.get_proposer_duties(epoch + 1),
+                ) {
+                    Ok(((_, mut duties), (_, next_duties))) => {
+                        duties.extend(next_duties);
+                        break Ok(duties)
+                    }
+                    Err(e) => {
+                        warn!(error = ?e, "Failed to get proposer duties, retrying...");
+                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                    }
+                }
+            } else {
+                match self.inner.get_proposer_duties(epoch).await {
+                    Ok((_, duties)) => break Ok(duties),
+                    Err(e) => {
+                        warn!(error = ?e, "Failed to get proposer duties, retrying...");
+                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                    }
+                }
+            };
+        }
+    }
+
+    /// Gets the current epoch from the sync status `head_slot`.
+    ///
+    /// # Retries
+    /// This method will retry indefinitely in case of a failure.
+    pub(crate) async fn get_epoch(&self) -> Result<u64, BeaconClientError> {
+        loop {
+            match self.inner.get_sync_status().await {
+                Ok(status) => break Ok(status.head_slot / 32),
+                Err(e) => {
+                    warn!(error = ?e, "Failed to get epoch, retrying...");
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                }
+            }
+        }
     }
 }
 

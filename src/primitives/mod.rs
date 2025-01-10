@@ -4,6 +4,7 @@ use ethereum_consensus::crypto::PublicKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
+pub(crate) mod beacon;
 pub(crate) mod registry;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Deref, DerefMut, From, PartialEq, Eq, Hash)]

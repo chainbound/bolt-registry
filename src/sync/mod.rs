@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use beacon_api_client::ProposerDuty;
-use chain::{BeaconClient, EpochTransition, EpochTransitionStream};
+use chain::{EpochTransition, EpochTransitionStream};
 use reqwest::IntoUrl;
 use thiserror::Error;
 use tokio::{sync::watch, task::JoinHandle};
@@ -11,6 +11,7 @@ use tokio_stream::StreamExt;
 use tracing::{error, info};
 
 use crate::{
+    client::{beacon::BeaconClientError, BeaconClient},
     db::RegistryDb,
     primitives::{
         registry::{Operator, Registration},
@@ -24,7 +25,7 @@ mod chain;
 #[derive(Debug, Error)]
 pub(crate) enum SyncError {
     #[error(transparent)]
-    Beacon(#[from] beacon_api_client::Error),
+    Beacon(#[from] BeaconClientError),
 }
 
 enum SyncState {
@@ -82,7 +83,7 @@ where
         let (state_tx, state_rx) = watch::channel(SyncState::Synced);
         let handle = SyncHandle { state: state_rx };
 
-        let beacon_client = BeaconClient::new(beacon_url);
+        let beacon_client = BeaconClient::new(beacon_url.into_url().unwrap());
 
         // TODO: read the last block number from the database and use as checkpoint for backfill
         let syncer =

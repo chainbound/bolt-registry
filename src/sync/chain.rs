@@ -4,115 +4,9 @@ use std::{
     task::{Context, Poll},
 };
 
-use beacon_api_client::{
-    mainnet::MainnetClientTypes, Client, Error, PayloadAttributesTopic, ProposerDuty,
-};
-use reqwest::IntoUrl;
-use tokio_stream::{Stream, StreamExt};
-use tracing::warn;
+use tokio_stream::Stream;
 
-/// A client that can subscribe to SSE events.
-pub(super) struct BeaconClient {
-    client: Client<MainnetClientTypes>,
-}
-
-/// A payload attribute event.
-#[derive(Debug, Clone)]
-pub(super) struct PayloadAttribute {
-    proposal_slot: u64,
-    parent_block_number: u64,
-}
-
-impl BeaconClient {
-    pub(super) fn new(url: impl IntoUrl) -> Self {
-        Self { client: Client::new(url.into_url().unwrap()) }
-    }
-
-    /// Subscribes to the payload attributes events. Returns a stream of filtered payload attributes
-    /// in the form of [`PayloadAttribute`]. These events are emitted by beacon nodes in 3 cases:
-    /// 1. Around the 12s mark.
-    /// 2. When a new head is processed.
-    /// 3. At a 4 seconds into a slot, without a new head.
-    ///
-    /// Note that multiple payload attribute events can be emitted for the same `proposal_slot`.
-    ///
-    /// # Retries
-    /// This method will retry indefinitely in case of a failure.
-    pub(super) async fn subscribe_payload_attributes(
-        &self,
-    ) -> Result<impl Stream<Item = PayloadAttribute> + Send + Unpin, Error> {
-        let events = loop {
-            match self.client.get_events::<PayloadAttributesTopic>().await {
-                Ok(events) => break events,
-                Err(e) => {
-                    warn!(error = ?e, "Failed to subscribe to payload attributes, retrying...");
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                }
-            }
-        };
-
-        let stream = events.filter_map(|event| {
-            event
-                .map(|value| PayloadAttribute {
-                    proposal_slot: value.data.proposal_slot,
-                    parent_block_number: value.data.parent_block_number,
-                })
-                .ok()
-        });
-
-        Ok(stream)
-    }
-
-    /// Gets the lookahead for the given epoch. If `extended` is `true`, it will also fetch the
-    /// lookahead for the next epoch, which is considered unstable.
-    ///
-    /// # Retries
-    /// This method will retry indefinitely in case of a failure.
-    pub(super) async fn get_lookahead(
-        &self,
-        epoch: u64,
-        extended: bool,
-    ) -> Result<Vec<ProposerDuty>, Error> {
-        loop {
-            if extended {
-                match tokio::try_join!(
-                    self.client.get_proposer_duties(epoch),
-                    self.client.get_proposer_duties(epoch + 1),
-                ) {
-                    Ok(((_, mut duties), (_, next_duties))) => {
-                        duties.extend(next_duties);
-                        break Ok(duties)
-                    }
-                    Err(e) => {
-                        warn!(error = ?e, "Failed to get proposer duties, retrying...");
-                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                    }
-                }
-            } else {
-                match self.client.get_proposer_duties(epoch).await {
-                    Ok((_, duties)) => break Ok(duties),
-                    Err(e) => {
-                        warn!(error = ?e, "Failed to get proposer duties, retrying...");
-                        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                    }
-                }
-            };
-        }
-    }
-
-    /// Gets the current epoch from the sync status `head_slot`.
-    pub(super) async fn get_epoch(&self) -> Result<u64, Error> {
-        loop {
-            match self.client.get_sync_status().await {
-                Ok(status) => break Ok(status.head_slot / 32),
-                Err(e) => {
-                    warn!(error = ?e, "Failed to get epoch, retrying...");
-                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-                }
-            }
-        }
-    }
-}
+use crate::primitives::beacon::PayloadAttribute;
 
 /// An epoch transition event. Originates from the payload attribute stream, when the
 /// (`proposal_slot` - 1) is a multiple of 32.
@@ -180,27 +74,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloy::primitives::B256;
-    use beacon_api_client::Topic;
-    use serde::Deserialize;
+    use tokio_stream::StreamExt;
     use tracing::{warn, Level};
+    use url::Url;
 
-    use super::*;
-
-    struct NewHeadsTopic;
-
-    impl Topic for NewHeadsTopic {
-        const NAME: &'static str = "head";
-
-        type Data = TestHead;
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct TestHead {
-        slot: String,
-        block: B256,
-        epoch_transition: bool,
-    }
+    use crate::client::BeaconClient;
 
     #[tokio::test]
     async fn test_subscribe() {
@@ -211,27 +89,20 @@ mod tests {
             return
         };
 
-        let client = BeaconClient::new(beacon_url);
+        let client = BeaconClient::new(Url::parse(&beacon_url).unwrap());
         let mut stream = client.subscribe_payload_attributes().await.unwrap();
 
-        let mut head_stream = client.client.get_events::<NewHeadsTopic>().await.unwrap();
+        let mut head_stream = client.subscribe_new_heads().await.unwrap();
 
         let mut epoch_transition = false;
 
         loop {
             tokio::select! {
-                Some(result) = head_stream.next() => {
-                    match result {
-                        Ok(head) => {
-                            println!("New Head: {:?} {:?}", head.slot, head.block);
-                            if head.epoch_transition {
-                                assert!(epoch_transition, "Epoch transition based on head stream");
-                                break
-                            }
-                        },
-                        Err(e) => {
-                            println!("Error: {:?}", e);
-                        }
+                Some(head) = head_stream.next() => {
+                    println!("New Head: {:?} {:?}", head.slot, head.block);
+                    if head.epoch_transition {
+                        assert!(epoch_transition, "Epoch transition based on head stream");
+                        break
                     }
                 },
                 Some(payload) = stream.next() => {
