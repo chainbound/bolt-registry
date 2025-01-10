@@ -7,7 +7,7 @@ use crate::primitives::{registry::RegistryEntry, BlsPublicKey};
 
 use super::{ExternalSource, SourceError};
 
-const VALIDATORS_PATH: &str = "/v1/preconfs/bolt-lido/validators";
+const VALIDATORS_PATH: &str = "/v1/preconfs/lido-bolt/validators";
 
 const DEFAULT_GAS_LIMIT: u64 = 10_000_000;
 
@@ -18,7 +18,26 @@ pub(crate) struct KeysApi {
     url: Url,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
+struct RequestBody<'a> {
+    #[serde(rename = "pubKeys")]
+    pubkeys: &'a [BlsPublicKey],
+}
+
+#[derive(Debug, Deserialize)]
+struct ResponseBody {
+    data: Vec<ValidatorEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ErrorResponse {
+    #[serde(rename = "statusCode")]
+    status_code: u16,
+    message: String,
+    error: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct ValidatorEntry {
     #[serde(rename = "pubKey")]
     pubkey: BlsPublicKey,
@@ -39,10 +58,10 @@ impl KeysApi {
     #[inline]
     fn get_validators_request(&self, pubkeys: &[BlsPublicKey]) -> RequestBuilder {
         let url = self.url.join(VALIDATORS_PATH).unwrap();
-        let pubkeys_query =
-            pubkeys.iter().map(|pubkey| pubkey.to_string()).collect::<Vec<_>>().join(",");
 
-        self.client.get(url).query(&[("pubkeys", pubkeys_query)])
+        let body = RequestBody { pubkeys };
+
+        self.client.post(url).json(&body)
     }
 }
 
@@ -57,11 +76,20 @@ impl ExternalSource for KeysApi {
         &self,
         pubkeys: &[BlsPublicKey],
     ) -> Result<Vec<RegistryEntry>, SourceError> {
-        let response = self.get_validators_request(pubkeys).send().await?;
+        let res = self.get_validators_request(pubkeys).send().await?;
+        if !res.status().is_success() {
+            let response = res.json::<ErrorResponse>().await?;
 
-        let entries: Vec<ValidatorEntry> = response.json().await?;
+            return Err(SourceError::Other(format!(
+                "API error: {} ({})",
+                response.message, response.error
+            )));
+        }
 
-        entries
+        let response: ResponseBody = res.json().await?;
+
+        response
+            .data
             .into_iter()
             .map(|entry| {
                 Ok(RegistryEntry {
@@ -89,8 +117,8 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_get_validators_request() -> eyre::Result<()> {
+    #[tokio::test]
+    async fn test_get_validators_request() -> eyre::Result<()> {
         let url = "http://34.88.187.80:30303/";
         let keys_api = KeysApi::new(url);
 
@@ -99,6 +127,10 @@ mod tests {
         let request = keys_api.get_validators_request(&pubkeys);
 
         println!("{}", request.build()?.url());
+
+        let response = keys_api.get_validators(&pubkeys).await?;
+
+        println!("{response:?}");
 
         Ok(())
     }

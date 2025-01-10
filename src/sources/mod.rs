@@ -15,6 +15,8 @@ pub(crate) mod mock;
 pub(crate) enum SourceError {
     #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
+    #[error("{0}")]
+    Other(String),
 }
 
 /// External source trait.
