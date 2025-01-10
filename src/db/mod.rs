@@ -21,13 +21,6 @@ pub(crate) use sql::SQLDb;
 
 pub(crate) type DbResult<T> = Result<T, DbError>;
 
-/// Database wrapper enum, that facilitates initialization of different database backends
-/// for the registry, without relying on dynamic dispatch.
-pub(crate) enum DbWrapper<Db: sqlx::Database> {
-    InMemory(InMemoryDb),
-    SQL(SQLDb<Db>),
-}
-
 /// Database error type.
 // TODO: Implement `is_transient` or `is_retryable` methods.
 #[derive(Debug, thiserror::Error)]
