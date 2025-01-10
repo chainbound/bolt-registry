@@ -112,6 +112,7 @@ where
     pub(crate) fn spawn(mut self) -> JoinHandle<Result<(), SyncError>> {
         tokio::spawn(async move {
             // Set initial state
+            // NOTE: this will fail if no sync state is present in the DB.
             let sync_state = self.db.get_sync_state().await?;
             self.last_epoch = sync_state.epoch;
             self.last_block_number = sync_state.block_number;
