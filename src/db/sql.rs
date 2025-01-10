@@ -217,6 +217,23 @@ impl RegistryDb for SQLDb<Postgres> {
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
+    async fn get_sync_state(&self) -> DbResult<SyncStateUpdate> {
+        let (block_number, epoch, slot): (i64, i64, i64) = sqlx::query_as(
+            "
+            SELECT block_number, epoch, slot
+            FROM sync_state
+            ",
+        )
+        .fetch_one(&self.conn)
+        .await?;
+
+        Ok(SyncStateUpdate {
+            block_number: block_number as u64,
+            epoch: epoch as u64,
+            slot: slot as u64,
+        })
+    }
+
     async fn update_sync_state(&self, state: SyncStateUpdate) -> DbResult<()> {
         sqlx::query(
             "

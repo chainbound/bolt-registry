@@ -8,7 +8,7 @@ use reqwest::IntoUrl;
 use thiserror::Error;
 use tokio::{sync::watch, task::JoinHandle};
 use tokio_stream::StreamExt;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use crate::{
     client::{beacon::BeaconClientError, BeaconClient},
@@ -26,6 +26,8 @@ mod chain;
 pub(crate) enum SyncError {
     #[error(transparent)]
     Beacon(#[from] BeaconClientError),
+    #[error(transparent)]
+    Db(#[from] crate::db::DbError),
 }
 
 enum SyncState {
@@ -106,13 +108,17 @@ where
         self.source = Some(Box::new(source));
     }
 
-    pub(crate) fn set_last_epoch(&mut self, epoch: u64) {
-        self.last_epoch = epoch;
-    }
-
     /// Spawns the [`Syncer`] actor task.
     pub(crate) fn spawn(mut self) -> JoinHandle<Result<(), SyncError>> {
         tokio::spawn(async move {
+            // Set initial state
+            // NOTE: this will fail if no sync state is present in the DB.
+            let sync_state = self.db.get_sync_state().await?;
+            self.last_epoch = sync_state.epoch;
+            self.last_block_number = sync_state.block_number;
+
+            info!(?sync_state, "Loaded sync state from DB");
+
             let pa_stream = self.beacon_client.subscribe_payload_attributes().await?;
 
             let mut epoch_stream = EpochTransitionStream::new(pa_stream);
@@ -128,10 +134,16 @@ where
     /// Handles an epoch transition event.
     async fn on_transition(&mut self, transition: EpochTransition) {
         let start = std::time::Instant::now();
+
+        let epoch_distance = transition.epoch - self.last_epoch;
+        let block_distance = transition.block_number - self.last_block_number;
+
         info!(
             epoch = transition.epoch,
             slot = transition.slot,
             block_number = transition.block_number,
+            epoch_distance,
+            block_distance,
             "New epoch transition"
         );
 
@@ -142,6 +154,7 @@ where
 
         // Sync from the last known epoch to the new epoch
         for epoch in self.last_epoch..=transition.epoch {
+            debug!("Syncing epoch {}", epoch);
             // TODO: handle failure here (currently infinitely retried inside beacon_client)
             let Ok(lookahead) = self.beacon_client.get_lookahead(epoch, true).await else {
                 error!("Failed to get lookahead for epoch {}", transition.epoch);
@@ -151,19 +164,27 @@ where
             self.sync_lookahead(lookahead).await;
         }
 
-        // Update last epoch
-        self.last_epoch = transition.epoch;
-
         // Update the sync state in the database
-        // TODO: retries on transient faults (e.g. network errors)
-        // TODO: ideally all DB operation in an epoch transition need to be made
-        // in a single transaction to avoid partial updates in case of failure
-        if let Err(e) = self.db.update_sync_state(SyncStateUpdate::from(transition)).await {
-            error!(error = ?e, "Failed to update sync state in the database");
+        if let Err(e) = self.finalize_sync(SyncStateUpdate::from(transition)).await {
+            error!(error = ?e, "Failed to finalize sync");
         }
 
         info!(elapsed = ?start.elapsed(), "Transition handled");
+    }
+
+    /// Finalizes a sync operation. Sets internal state to the newly synced state, updates the DB,
+    /// and notifies the state channel.
+    async fn finalize_sync(&mut self, state: SyncStateUpdate) -> Result<(), SyncError> {
+        // Update last epoch
+        self.last_epoch = state.epoch;
+        self.last_block_number = state.block_number;
+
+        // TODO: retries on transient faults (e.g. network errors)
+        // TODO: ideally all DB operation in an epoch transition need to be made
+        // in a single transaction to avoid partial updates in case of failure
+        self.db.update_sync_state(state).await?;
         let _ = self.state.send(SyncState::Synced);
+        Ok(())
     }
 
     /// Syncs contract events from the last known block number to the given block number.
@@ -282,7 +303,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_external_source_sync() -> eyre::Result<()> {
-        let _ = tracing_subscriber::fmt().with_max_level(tracing::Level::INFO).try_init();
+        let _ = tracing_subscriber::fmt().with_max_level(tracing::Level::DEBUG).try_init();
 
         let Ok(beacon_url) = std::env::var("BEACON_URL") else {
             tracing::warn!("Skipping test because of missing BEACON_URL");
@@ -315,7 +336,8 @@ mod tests {
         }
 
         // Make sure we don't sync from scatch
-        syncer.set_last_epoch(epoch - 1);
+        db.update_sync_state(SyncStateUpdate { block_number: 0, epoch: epoch - 1, slot: 0 })
+            .await?;
 
         syncer.set_source(source);
         syncer.spawn();

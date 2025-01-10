@@ -79,6 +79,9 @@ pub(crate) trait RegistryDb: Clone {
     /// Get a batch of operators from the database, by their signer addresses.
     async fn get_operators_by_signer(&self, signers: &[Address]) -> DbResult<Vec<Operator>>;
 
+    /// Get the current sync state from the database.
+    async fn get_sync_state(&self) -> DbResult<SyncStateUpdate>;
+
     /// Update the sync state in the database.
     async fn update_sync_state(&self, state: SyncStateUpdate) -> DbResult<()>;
 }
