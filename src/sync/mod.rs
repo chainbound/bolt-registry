@@ -300,6 +300,7 @@ mod tests {
 
         // Check validator registration
         assert!(!db.get_validators_by_pubkey(&[pubkey.clone()]).await?.is_empty());
+        assert!(!db.get_operators_by_signer(&[operator]).await?.is_empty());
 
         Ok(())
     }
