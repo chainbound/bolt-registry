@@ -50,6 +50,7 @@ pub(crate) trait SyncTransaction {
     /// Register an operator in the database.
     async fn register_operator(&mut self, operator: Operator) -> DbResult<()>;
 
+    /// Commit and finalize the sync transaction with the updated state.
     async fn commit(self, state: SyncStateUpdate) -> DbResult<()>;
 }
 
