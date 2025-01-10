@@ -1,5 +1,5 @@
 //! Module `api` contains the API server for the registry. The API server is defined in
-//! [`spec::ApiSpec`];
+//! [`spec::ValidatorSpec`] and [`spec::DiscoverySpec`], and is implemented by [`RegistryApi`].
 
 use std::{io, net::SocketAddr, sync::Arc, time::Duration};
 
