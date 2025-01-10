@@ -15,7 +15,7 @@ use crate::{
     db::RegistryDb,
     primitives::{
         registry::{Operator, Registration},
-        BlsPublicKey,
+        BlsPublicKey, SyncStateUpdate,
     },
     sources::ExternalSource,
 };
@@ -153,6 +153,14 @@ where
 
         // Update last epoch
         self.last_epoch = transition.epoch;
+
+        // Update the sync state in the database
+        // TODO: retries on transient faults (e.g. network errors)
+        // TODO: ideally all DB operation in an epoch transition need to be made
+        // in a single transaction to avoid partial updates in case of failure
+        if let Err(e) = self.db.update_sync_state(SyncStateUpdate::from(transition)).await {
+            error!(error = ?e, "Failed to update sync state in the database");
+        }
 
         info!(elapsed = ?start.elapsed(), "Transition handled");
         let _ = self.state.send(SyncState::Synced);

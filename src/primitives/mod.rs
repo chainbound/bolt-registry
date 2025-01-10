@@ -47,3 +47,11 @@ impl DigestExt for Digest {
         arr.into()
     }
 }
+
+/// Sync state of the registry database.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub(crate) struct SyncStateUpdate {
+    pub(crate) block_number: u64,
+    pub(crate) epoch: u64,
+    pub(crate) slot: u64,
+}

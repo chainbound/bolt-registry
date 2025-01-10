@@ -5,6 +5,7 @@ use tracing::info;
 use super::{
     types::{OperatorRow, ValidatorRegistrationRow},
     BlsPublicKey, DbResult, Deregistration, Operator, Registration, RegistryDb, RegistryEntry,
+    SyncStateUpdate,
 };
 
 /// Generic SQL database implementation, that supports all `SQLx` backends.
@@ -214,5 +215,23 @@ impl RegistryDb for SQLDb<Postgres> {
             .await?;
 
         rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn update_sync_state(&self, state: SyncStateUpdate) -> DbResult<()> {
+        sqlx::query(
+            "
+            INSERT INTO sync_state (block_number, epoch, slot)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (block_number)
+            DO UPDATE SET epoch = $2, slot = $3
+            ",
+        )
+        .bind(state.block_number as i64)
+        .bind(state.epoch as i64)
+        .bind(state.slot as i64)
+        .execute(&self.conn)
+        .await?;
+
+        Ok(())
     }
 }

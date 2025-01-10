@@ -103,5 +103,5 @@ fn parse_pubkey(value: &[u8]) -> Result<BlsPublicKey, DbError> {
 
 /// Utility function to parse a BLS signature from a byte array.
 fn parse_signature(value: Option<impl AsRef<[u8]>>) -> Option<BlsSignature> {
-    value.map(|v| BlsSignature::deserialize(v.as_ref()).ok()).flatten()
+    value.and_then(|v| BlsSignature::deserialize(v.as_ref()).ok())
 }

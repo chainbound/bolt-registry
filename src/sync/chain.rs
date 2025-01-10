@@ -6,15 +6,28 @@ use std::{
 
 use tokio_stream::Stream;
 
+use super::SyncStateUpdate;
 use crate::primitives::beacon::PayloadAttribute;
 
 /// An epoch transition event. Originates from the payload attribute stream, when the
 /// (`proposal_slot` - 1) is a multiple of 32.
 #[derive(Debug, Clone)]
 pub(super) struct EpochTransition {
+    pub(super) block_number: u64,
     pub(super) epoch: u64,
     pub(super) slot: u64,
-    pub(super) block_number: u64,
+}
+
+// This transformation doesn't make much sense, but by having different types for the
+// syncer and the database we keep the codebase consistent and allow for future DB changes.
+impl From<EpochTransition> for SyncStateUpdate {
+    fn from(transition: EpochTransition) -> Self {
+        Self {
+            block_number: transition.block_number,
+            epoch: transition.epoch,
+            slot: transition.slot,
+        }
+    }
 }
 
 pub(super) struct EpochTransitionStream<S> {

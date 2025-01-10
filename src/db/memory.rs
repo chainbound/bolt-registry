@@ -6,7 +6,10 @@ use std::{
 use alloy::primitives::Address;
 use tracing::info;
 
-use crate::primitives::registry::{Deregistration, RegistryEntry};
+use crate::primitives::{
+    registry::{Deregistration, RegistryEntry},
+    SyncStateUpdate,
+};
 
 use super::{BlsPublicKey, DbResult, Operator, Registration, RegistryDb};
 
@@ -15,6 +18,7 @@ pub(crate) struct InMemoryDb {
     validator_registrations: Arc<RwLock<HashMap<BlsPublicKey, Registration>>>,
     index_to_pubkey: Arc<RwLock<HashMap<u64, BlsPublicKey>>>,
     operator_registrations: Arc<RwLock<HashMap<Address, Operator>>>,
+    sync_state: Arc<RwLock<SyncStateUpdate>>,
 }
 
 #[async_trait::async_trait]
@@ -145,5 +149,12 @@ impl RegistryDb for InMemoryDb {
         let operators = self.operator_registrations.read().unwrap();
 
         Ok(signers.iter().filter_map(|signer| operators.get(signer).cloned()).collect())
+    }
+
+    async fn update_sync_state(&self, state: SyncStateUpdate) -> DbResult<()> {
+        let mut sync_state = self.sync_state.write().unwrap();
+        *sync_state = state;
+
+        Ok(())
     }
 }
