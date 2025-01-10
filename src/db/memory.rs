@@ -151,6 +151,11 @@ impl RegistryDb for InMemoryDb {
         Ok(signers.iter().filter_map(|signer| operators.get(signer).cloned()).collect())
     }
 
+    async fn get_sync_state(&self) -> DbResult<SyncStateUpdate> {
+        let sync_state = self.sync_state.read().unwrap();
+        Ok(sync_state.clone())
+    }
+
     async fn update_sync_state(&self, state: SyncStateUpdate) -> DbResult<()> {
         let mut sync_state = self.sync_state.write().unwrap();
         *sync_state = state;
