@@ -1,6 +1,3 @@
-//! Lido Keys API source.
-//! <https://github.com/lidofinance/lido-keys-api/tree/develop>
-
 use alloy::primitives::Address;
 use reqwest::{IntoUrl, RequestBuilder};
 use serde::{Deserialize, Serialize};
@@ -8,17 +5,39 @@ use url::Url;
 
 use crate::primitives::{registry::RegistryEntry, BlsPublicKey};
 
-const VALIDATORS_PATH: &str = "/v1/preconfs/bolt-lido/validators";
+use super::{ExternalSource, SourceError};
+
+const VALIDATORS_PATH: &str = "/v1/preconfs/lido-bolt/validators";
 
 const DEFAULT_GAS_LIMIT: u64 = 10_000_000;
 
-struct KeysApi {
+/// Lido Keys API external source.
+pub(crate) struct KeysApi {
     client: reqwest::Client,
     /// The base URL of the API.
     url: Url,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
+struct RequestBody<'a> {
+    #[serde(rename = "pubKeys")]
+    pubkeys: &'a [BlsPublicKey],
+}
+
+#[derive(Debug, Deserialize)]
+struct ResponseBody {
+    data: Vec<ValidatorEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ErrorResponse {
+    #[serde(rename = "statusCode")]
+    status_code: u16,
+    message: String,
+    error: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct ValidatorEntry {
     #[serde(rename = "pubKey")]
     pubkey: BlsPublicKey,
@@ -36,16 +55,41 @@ impl KeysApi {
         }
     }
 
+    #[inline]
+    fn get_validators_request(&self, pubkeys: &[BlsPublicKey]) -> RequestBuilder {
+        let url = self.url.join(VALIDATORS_PATH).unwrap();
+
+        let body = RequestBody { pubkeys };
+
+        self.client.post(url).json(&body)
+    }
+}
+
+#[async_trait::async_trait]
+impl ExternalSource for KeysApi {
+    fn name(&self) -> &'static str {
+        "lido-keys-api"
+    }
+
     /// Fetches validators by `pubkeys` from the API.
-    pub(crate) async fn get_validators(
+    async fn get_validators(
         &self,
-        pubkeys: Vec<BlsPublicKey>,
-    ) -> Result<Vec<RegistryEntry>, reqwest::Error> {
-        let response = self.get_validators_request(pubkeys).send().await?;
+        pubkeys: &[BlsPublicKey],
+    ) -> Result<Vec<RegistryEntry>, SourceError> {
+        let res = self.get_validators_request(pubkeys).send().await?;
+        if !res.status().is_success() {
+            let response = res.json::<ErrorResponse>().await?;
 
-        let entries: Vec<ValidatorEntry> = response.json().await?;
+            return Err(SourceError::Other(format!(
+                "API error: {} ({})",
+                response.message, response.error
+            )));
+        }
 
-        entries
+        let response: ResponseBody = res.json().await?;
+
+        response
+            .data
             .into_iter()
             .map(|entry| {
                 Ok(RegistryEntry {
@@ -56,15 +100,6 @@ impl KeysApi {
                 })
             })
             .collect()
-    }
-
-    #[inline]
-    fn get_validators_request(&self, pubkeys: Vec<BlsPublicKey>) -> RequestBuilder {
-        let url = self.url.join(VALIDATORS_PATH).unwrap();
-        let pubkeys_query =
-            pubkeys.iter().map(|pubkey| pubkey.to_string()).collect::<Vec<_>>().join(",");
-
-        self.client.get(url).query(&[("pubkeys", pubkeys_query)])
     }
 }
 
@@ -82,16 +117,20 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_get_validators_request() -> eyre::Result<()> {
+    #[tokio::test]
+    async fn test_get_validators_request() -> eyre::Result<()> {
         let url = "http://34.88.187.80:30303/";
         let keys_api = KeysApi::new(url);
 
         let pubkeys = vec![BlsPublicKey::random(), BlsPublicKey::random(), BlsPublicKey::random()];
 
-        let request = keys_api.get_validators_request(pubkeys);
+        let request = keys_api.get_validators_request(&pubkeys);
 
         println!("{}", request.build()?.url());
+
+        let response = keys_api.get_validators(&pubkeys).await?;
+
+        println!("{response:?}");
 
         Ok(())
     }

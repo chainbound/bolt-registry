@@ -1,6 +1,10 @@
+use alloy::primitives::{Address, FixedBytes};
 use derive_more::derive::{Deref, DerefMut, From};
+use ethereum_consensus::crypto::PublicKey;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest as _, Sha256};
 
+pub(crate) mod beacon;
 pub(crate) mod registry;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Deref, DerefMut, From, PartialEq, Eq, Hash)]
@@ -12,20 +16,42 @@ impl BlsPublicKey {
         Self(bls::Keypair::random().pk)
     }
 
-    /// Helper function to convert the public key from the `ethereum_consensus` crate.
-    pub(crate) fn from_consensus(pk: ethereum_consensus::primitives::BlsPublicKey) -> Self {
-        let bytes = bls::PublicKey::deserialize(pk.as_ref()).expect("valid BLS public key");
-        Self::from(bytes)
+    /// Creates a new `BlsPublicKey` from a compressed byte slice.
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Self, bls::Error> {
+        Ok(Self(bls::PublicKey::deserialize(bytes)?))
     }
 
-    /// Helper function to convert the public key to the `ethereum_consensus` crate.
-    pub(crate) fn to_consensus(&self) -> ethereum_consensus::primitives::BlsPublicKey {
-        let bytes = self.compress().serialize();
-        ethereum_consensus::primitives::BlsPublicKey::try_from(bytes.as_ref())
-            .expect("valid BLS public key")
+    pub(crate) fn to_consensus(&self) -> PublicKey {
+        PublicKey::try_from(self.0.compress().serialize().as_ref()).unwrap()
     }
 }
 
 pub(crate) type BlsSignature = bls::Signature;
 
-pub(crate) type Digest = [u8; 32];
+pub(crate) type Digest = FixedBytes<32>;
+
+pub(crate) trait DigestExt {
+    fn from_parts(operator: Address, gas_limit: u64, expiry: u64) -> Self;
+}
+
+impl DigestExt for Digest {
+    fn from_parts(operator: Address, gas_limit: u64, expiry: u64) -> Self {
+        let mut hasher = Sha256::new();
+        hasher.update(operator.0);
+
+        // IMPORTANT: use big-endian encoding for cross-platform compatibility
+        hasher.update(gas_limit.to_be_bytes());
+        hasher.update(expiry.to_be_bytes());
+
+        let arr: [u8; 32] = hasher.finalize().into();
+        arr.into()
+    }
+}
+
+/// Sync state of the registry database.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub(crate) struct SyncStateUpdate {
+    pub(crate) block_number: u64,
+    pub(crate) epoch: u64,
+    pub(crate) slot: u64,
+}

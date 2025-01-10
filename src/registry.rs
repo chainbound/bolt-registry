@@ -12,6 +12,7 @@ use crate::{
         registry::{DeregistrationBatch, Operator, Registration, RegistrationBatch, RegistryEntry},
         BlsPublicKey,
     },
+    sources::kapi::KeysApi,
     sync::{SyncHandle, Syncer},
 };
 
@@ -26,9 +27,18 @@ pub(crate) struct Registry<Db> {
     sync: SyncHandle,
 }
 
-impl<Db: RegistryDb> Registry<Db> {
+impl<Db> Registry<Db>
+where
+    Db: RegistryDb + Send + Sync + Clone + 'static,
+{
     pub(crate) fn new(config: Config, db: Db, beacon: BeaconClient) -> Self {
-        let (syncer, handle) = Syncer::new(&config.beacon_url, db.clone());
+        let kapi = KeysApi::new(&config.keys_api_url);
+        // TODO: add health check for the keys API before proceeding
+
+        let (mut syncer, handle) = Syncer::new(config.beacon_url, db.clone());
+
+        // Set source
+        syncer.set_source(kapi);
 
         let _sync_task = syncer.spawn();
 
@@ -49,7 +59,12 @@ impl<Db: RegistryDb> Registry<Db> {
         // 2. collect a map of validator public keys to their indices
         let index_map = validators
             .into_iter()
-            .map(|v| (BlsPublicKey::from_consensus(v.validator.public_key), v.index))
+            .map(|v| {
+                (
+                    BlsPublicKey::from_bytes(&v.validator.public_key).expect("valid BLS pubkey"),
+                    v.index as u64,
+                )
+            })
             .collect::<HashMap<_, _>>();
 
         // 3. check that all validators are present
@@ -111,7 +126,7 @@ impl<Db: RegistryDb> Registry<Db> {
 
     pub(crate) async fn get_validators_by_index(
         &mut self,
-        indices: Vec<usize>,
+        indices: Vec<u64>,
     ) -> Result<Vec<RegistryEntry>, RegistryError> {
         self.sync.wait_for_sync().await;
         Ok(self.db.get_validators_by_index(indices).await?)

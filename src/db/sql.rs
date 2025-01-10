@@ -5,6 +5,7 @@ use tracing::info;
 use super::{
     types::{OperatorRow, ValidatorRegistrationRow},
     BlsPublicKey, DbResult, Deregistration, Operator, Registration, RegistryDb, RegistryEntry,
+    SyncStateUpdate,
 };
 
 /// Generic SQL database implementation, that supports all `SQLx` backends.
@@ -45,6 +46,7 @@ impl<Db: sqlx::Database> Clone for SQLDb<Db> {
     }
 }
 
+#[async_trait::async_trait]
 impl RegistryDb for SQLDb<Postgres> {
     async fn register_validators(&self, registrations: &[Registration]) -> DbResult<()> {
         let mut transaction = self.conn.begin().await?;
@@ -58,7 +60,7 @@ impl RegistryDb for SQLDb<Postgres> {
             )
             .bind(registration.validator_pubkey.serialize())
             .bind(registration.validator_index as i64)
-            .bind(registration.signature.serialize())
+            .bind(registration.signature.as_ref().map(|s| s.serialize()))
             .bind(registration.expiry.to_string())
             .bind(registration.operator.to_vec())
             .bind(0) // TODO: priority
@@ -123,7 +125,7 @@ impl RegistryDb for SQLDb<Postgres> {
         &self,
         pubkeys: &[BlsPublicKey],
     ) -> DbResult<Vec<Registration>> {
-        let rows: Vec<ValidatorRegistrationRow> = 
+        let rows: Vec<ValidatorRegistrationRow> =
             sqlx::query_as(
                     "
                     SELECT pubkey, index, signature, expiry, gas_limit, operator, priority, source, last_update
@@ -155,7 +157,7 @@ impl RegistryDb for SQLDb<Postgres> {
         &self,
         pubkeys: &[BlsPublicKey],
     ) -> DbResult<Vec<RegistryEntry>> {
-        let rows: Vec<ValidatorRegistrationRow> = 
+        let rows: Vec<ValidatorRegistrationRow> =
             sqlx::query_as(
                 "
                 SELECT vr.pubkey, vr.index, vr.signature, vr.expiry, vr.gas_limit, vr.operator, vr.priority, vr.source, vr.last_update, o.rpc
@@ -166,13 +168,12 @@ impl RegistryDb for SQLDb<Postgres> {
             .bind(pubkeys.iter().map(|p| p.serialize()).collect::<Vec<_>>())
             .fetch_all(&self.conn)
             .await?;
-        
 
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
-    async fn get_validators_by_index(&self, indices: Vec<usize>) -> DbResult<Vec<RegistryEntry>> {
-        let rows: Vec<ValidatorRegistrationRow> = 
+    async fn get_validators_by_index(&self, indices: Vec<u64>) -> DbResult<Vec<RegistryEntry>> {
+        let rows: Vec<ValidatorRegistrationRow> =
             sqlx::query_as(
                 "
                 SELECT vr.pubkey, vr.index, vr.signature, vr.expiry, vr.gas_limit, vr.operator, vr.priority, vr.source, vr.last_update, o.rpc
@@ -183,7 +184,7 @@ impl RegistryDb for SQLDb<Postgres> {
             .bind(indices.into_iter().map(|i| i as i64).collect::<Vec<_>>())
             .fetch_all(&self.conn)
             .await?;
-        
+
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
@@ -201,7 +202,7 @@ impl RegistryDb for SQLDb<Postgres> {
     }
 
     async fn get_operators_by_signer(&self, signers: &[Address]) -> DbResult<Vec<Operator>> {
-        let rows: Vec<OperatorRow> = 
+        let rows: Vec<OperatorRow> =
             sqlx::query_as(
                 "
                 SELECT signer, rpc, protocol, source, collateral_tokens, collateral_amounts, last_update
@@ -212,7 +213,42 @@ impl RegistryDb for SQLDb<Postgres> {
             .bind(signers.iter().map(|s| s.to_vec()).collect::<Vec<_>>())
             .fetch_all(&self.conn)
             .await?;
-        
+
         rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn get_sync_state(&self) -> DbResult<SyncStateUpdate> {
+        let (block_number, epoch, slot): (i64, i64, i64) = sqlx::query_as(
+            "
+            SELECT block_number, epoch, slot
+            FROM sync_state
+            ",
+        )
+        .fetch_one(&self.conn)
+        .await?;
+
+        Ok(SyncStateUpdate {
+            block_number: block_number as u64,
+            epoch: epoch as u64,
+            slot: slot as u64,
+        })
+    }
+
+    async fn update_sync_state(&self, state: SyncStateUpdate) -> DbResult<()> {
+        sqlx::query(
+            "
+            INSERT INTO sync_state (block_number, epoch, slot)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (block_number)
+            DO UPDATE SET epoch = $2, slot = $3
+            ",
+        )
+        .bind(state.block_number as i64)
+        .bind(state.epoch as i64)
+        .bind(state.slot as i64)
+        .execute(&self.conn)
+        .await?;
+
+        Ok(())
     }
 }

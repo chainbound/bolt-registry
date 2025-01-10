@@ -3,20 +3,24 @@
 use client::BeaconClient;
 use tokio_stream::StreamExt;
 use tracing::{error, info};
+use url::Url;
 
 mod api;
-use api::{actions::Action, spec::RegistryError, ApiConfig, RegistryApi};
+use api::{
+    actions::{Action, ActionStream},
+    spec::RegistryError,
+    ApiConfig, RegistryApi,
+};
 
 mod client;
 
 mod db;
-use db::SQLDb;
+use db::{InMemoryDb, RegistryDb, SQLDb};
 
 mod primitives;
 
 mod registry;
 use registry::Registry;
-use url::Url;
 
 mod sources;
 
@@ -31,18 +35,40 @@ async fn main() -> eyre::Result<()> {
     info!("Starting bolt registry server...");
 
     let config = cli::Opts::parse_config()?;
+    let beacon = BeaconClient::new(config.beacon_url.clone());
 
-    let db = SQLDb::new(&config.db_url).await?;
-    let beacon = BeaconClient::new(Url::parse(&config.beacon_url)?);
-
-    let mut registry = Registry::new(config, db, beacon);
-
-    let (srv, mut actions) = RegistryApi::new(ApiConfig::default());
+    let (srv, actions) = RegistryApi::new(ApiConfig::default());
 
     if let Err(e) = srv.spawn().await {
         error!("Failed to start API server: {}", e);
     }
 
+    // Initialize the registry with the specified database backend.
+    //
+    // * If a database URL is provided, use the SQL database backend.
+    // * Otherwise, use the in-memory cache backend.
+    if let Some(ref db_url) = config.db_url {
+        info!("Using PostgreSQL database backend");
+        let db = SQLDb::new(db_url).await?;
+        let registry = Registry::new(config, db, beacon);
+
+        handle_actions(actions, registry).await;
+    } else {
+        info!("Using In-memory database backend");
+        let db = InMemoryDb::default();
+        let registry = Registry::new(config, db, beacon);
+
+        handle_actions(actions, registry).await;
+    }
+
+    Ok(())
+}
+
+/// Handle incoming actions from the API server and update the registry.
+async fn handle_actions<Db>(mut actions: ActionStream, mut registry: Registry<Db>)
+where
+    Db: RegistryDb + Send + Sync + 'static,
+{
     while let Some(action) = actions.next().await {
         match action {
             Action::Register { registration, response } => {
@@ -90,6 +116,4 @@ async fn main() -> eyre::Result<()> {
             }
         }
     }
-
-    Ok(())
 }

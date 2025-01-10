@@ -6,14 +6,14 @@ use alloy::primitives::Address;
 
 use crate::primitives::{
     registry::{Deregistration, Operator, Registration, RegistryEntry},
-    BlsPublicKey,
+    BlsPublicKey, SyncStateUpdate,
 };
 
 mod types;
 
-/// No-op database implementation.
-mod noop;
-pub(crate) use noop::NoOpDb;
+/// In-memory database implementation.
+mod memory;
+pub(crate) use memory::InMemoryDb;
 
 /// SQL database backend implementation.
 mod sql;
@@ -22,6 +22,7 @@ pub(crate) use sql::SQLDb;
 pub(crate) type DbResult<T> = Result<T, DbError>;
 
 /// Database error type.
+// TODO: Implement `is_transient` or `is_retryable` methods.
 #[derive(Debug, thiserror::Error)]
 #[allow(missing_docs)]
 pub(crate) enum DbError {
@@ -40,6 +41,7 @@ pub(crate) enum DbError {
 }
 
 /// Registry database trait.
+#[async_trait::async_trait]
 pub(crate) trait RegistryDb: Clone {
     /// Register validators in the database.
     async fn register_validators(&self, registrations: &[Registration]) -> DbResult<()>;
@@ -69,11 +71,17 @@ pub(crate) trait RegistryDb: Clone {
     ) -> DbResult<Vec<RegistryEntry>>;
 
     /// Get a batch of validators from the database, by their beacon chain indices.
-    async fn get_validators_by_index(&self, indices: Vec<usize>) -> DbResult<Vec<RegistryEntry>>;
+    async fn get_validators_by_index(&self, indices: Vec<u64>) -> DbResult<Vec<RegistryEntry>>;
 
     /// List all operators in the database.
     async fn list_operators(&self) -> DbResult<Vec<Operator>>;
 
     /// Get a batch of operators from the database, by their signer addresses.
     async fn get_operators_by_signer(&self, signers: &[Address]) -> DbResult<Vec<Operator>>;
+
+    /// Get the current sync state from the database.
+    async fn get_sync_state(&self) -> DbResult<SyncStateUpdate>;
+
+    /// Update the sync state in the database.
+    async fn update_sync_state(&self, state: SyncStateUpdate) -> DbResult<()>;
 }

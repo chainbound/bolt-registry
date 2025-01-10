@@ -1111,6 +1111,7 @@ name = "bolt-registry"
 version = "0.1.0"
 dependencies = [
  "alloy",
+ "async-trait",
  "axum",
  "beacon-api-client",
  "bls",

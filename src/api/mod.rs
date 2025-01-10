@@ -69,7 +69,7 @@ impl Default for ApiConfig {
 #[derive(Deserialize, Default)]
 struct ValidatorFilter {
     pubkeys: Option<Vec<BlsPublicKey>>,
-    indices: Option<Vec<usize>>,
+    indices: Option<Vec<u64>>,
 }
 
 impl RegistryApi {
@@ -231,7 +231,7 @@ impl spec::DiscoverySpec for RegistryApi {
     #[tracing::instrument(skip(self))]
     async fn get_validators_by_indices(
         &self,
-        indices: Vec<usize>,
+        indices: Vec<u64>,
     ) -> Result<Vec<RegistryEntry>, spec::RegistryError> {
         let (tx, rx) = oneshot::channel();
 
@@ -292,8 +292,6 @@ impl spec::DiscoverySpec for RegistryApi {
 mod tests {
     use tokio_stream::StreamExt;
 
-    use crate::primitives::registry::RegistrationBatch;
-
     use super::*;
 
     #[tokio::test]
@@ -302,11 +300,15 @@ mod tests {
 
         let (api, mut stream) = RegistryApi::new(Default::default());
 
+        let operator = Address::random();
+        let gas_limit = 10_000u64;
+        let expiry = 0u64;
+
         let registration = RegistrationBatch {
             validator_pubkeys: vec![BlsPublicKey::random()],
-            operator: Address::random(),
-            gas_limit: 10_000,
-            expiry: 0,
+            operator,
+            gas_limit,
+            expiry,
             signatures: vec![],
         };
 
