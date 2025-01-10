@@ -12,7 +12,7 @@ use tracing::{debug, error, info};
 
 use crate::{
     client::{beacon::BeaconClientError, BeaconClient},
-    db::RegistryDb,
+    db::{RegistryDb, SyncTransaction},
     primitives::{
         registry::{Operator, Registration},
         BlsPublicKey, SyncStateUpdate,
@@ -81,7 +81,7 @@ pub(crate) struct Syncer<Db> {
 
 impl<Db> Syncer<Db>
 where
-    Db: RegistryDb + Send + Sync + 'static,
+    Db: RegistryDb,
 {
     /// Creates a new syncer with the given beacon and keys API URLs, and the database handle.
     pub(crate) fn new(beacon_url: impl IntoUrl, db: Db) -> (Self, SyncHandle) {
@@ -150,7 +150,18 @@ where
         // Update to syncing state
         let _ = self.state.send(SyncState::Syncing);
 
-        self.sync_contract_events(transition.block_number).await;
+        // Start a new sync transaction. This transaction atomically executes the following
+        // operations:
+        // - Register new validators from external sources
+        // - Register their associated operators from external sources
+        // - Register new operators from contract events
+        // - Update the state table
+        let Ok(mut sync_transaction) = self.db.begin_sync().await else {
+            error!("Failed to begin sync transaction");
+            return;
+        };
+
+        self.sync_contract_events(&mut sync_transaction, transition.block_number).await;
 
         // Sync from the last known epoch to the new epoch
         for epoch in self.last_epoch..=transition.epoch {
@@ -161,11 +172,13 @@ where
                 return;
             };
 
-            self.sync_lookahead(lookahead).await;
+            self.sync_lookahead(&mut sync_transaction, lookahead).await;
         }
 
         // Update the sync state in the database
-        if let Err(e) = self.finalize_sync(SyncStateUpdate::from(transition)).await {
+        if let Err(e) =
+            self.finalize_sync(sync_transaction, SyncStateUpdate::from(transition)).await
+        {
             error!(error = ?e, "Failed to finalize sync");
         }
 
@@ -174,21 +187,27 @@ where
 
     /// Finalizes a sync operation. Sets internal state to the newly synced state, updates the DB,
     /// and notifies the state channel.
-    async fn finalize_sync(&mut self, state: SyncStateUpdate) -> Result<(), SyncError> {
+    async fn finalize_sync(
+        &mut self,
+        sync_transaction: Db::SyncTransaction,
+        state: SyncStateUpdate,
+    ) -> Result<(), SyncError> {
         // Update last epoch
         self.last_epoch = state.epoch;
         self.last_block_number = state.block_number;
 
         // TODO: retries on transient faults (e.g. network errors)
-        // TODO: ideally all DB operation in an epoch transition need to be made
-        // in a single transaction to avoid partial updates in case of failure
-        self.db.update_sync_state(state).await?;
+        sync_transaction.commit(state).await?;
         let _ = self.state.send(SyncState::Synced);
         Ok(())
     }
 
     /// Syncs contract events from the last known block number to the given block number.
-    async fn sync_contract_events(&self, block_number: u64) {
+    async fn sync_contract_events(
+        &self,
+        sync_transaction: &mut Db::SyncTransaction,
+        block_number: u64,
+    ) {
         // TODO:
         // 1. Get contract logs from self.last_block_number to block_number
         // 2. Sync to database
@@ -196,7 +215,11 @@ where
     }
 
     /// Syncs the lookahead with external data sources.
-    async fn sync_lookahead(&self, lookahead: Vec<ProposerDuty>) {
+    async fn sync_lookahead(
+        &self,
+        sync_transaction: &mut Db::SyncTransaction,
+        lookahead: Vec<ProposerDuty>,
+    ) {
         let pubkeys = lookahead
             .into_iter()
             .map(|duty| {
@@ -281,12 +304,12 @@ where
 
         // TODO: retries on transient faults (e.g. network errors)
         // TODO: use a DB transaction here
-        if let Err(e) = self.db.register_validators(&registrations).await {
+        if let Err(e) = sync_transaction.register_validators(&registrations).await {
             error!(error = ?e, "Failed to register validators in the database");
         }
 
         for operator in operators.into_values() {
-            if let Err(e) = self.db.register_operator(operator).await {
+            if let Err(e) = sync_transaction.register_operator(operator).await {
                 error!(error = ?e, "Failed to register operator in the database");
             }
         }

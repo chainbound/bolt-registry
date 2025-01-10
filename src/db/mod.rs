@@ -55,8 +55,8 @@ pub(crate) trait SyncTransaction {
 
 /// Registry database trait.
 #[async_trait::async_trait]
-pub(crate) trait RegistryDb: Clone {
-    type SyncTransaction: SyncTransaction;
+pub(crate) trait RegistryDb: Clone + Send + Sync + 'static {
+    type SyncTransaction: SyncTransaction + Send;
 
     /// Begin a new sync transaction. A sync transaction groups database mutations together in a
     /// single atomic operation.

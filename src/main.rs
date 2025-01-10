@@ -67,7 +67,7 @@ async fn main() -> eyre::Result<()> {
 /// Handle incoming actions from the API server and update the registry.
 async fn handle_actions<Db>(mut actions: ActionStream, mut registry: Registry<Db>)
 where
-    Db: RegistryDb + Send + Sync + 'static,
+    Db: RegistryDb,
 {
     while let Some(action) = actions.next().await {
         match action {
