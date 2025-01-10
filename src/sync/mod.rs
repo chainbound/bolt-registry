@@ -171,7 +171,7 @@ where
             match source.get_validators(&pubkeys).await {
                 Ok(registrations) => break registrations,
                 Err(e) => {
-                    error!(error = ?e, "Failed to get validators from keys API, retrying...");
+                    error!(error = ?e, "Failed to get validators from {}, retrying...", source.name());
                     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
                 }
             }
@@ -217,6 +217,7 @@ where
                 let operator = Operator {
                     signer: entry.operator,
                     rpc_endpoint: entry.rpc_endpoint,
+                    // TODO: once collateral is supported, update this
                     collateral_tokens: vec![],
                     collateral_amounts: vec![],
                 };
