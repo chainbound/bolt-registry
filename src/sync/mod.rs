@@ -72,11 +72,14 @@ pub(crate) struct Syncer<Db> {
     /// The last known block number. Whenever a new epoch transition occurs, sync contract events
     /// from this block number to the new block number.
     last_block_number: u64,
+    /// The last known epoch number. Whenever a new epoch transition occurs, sync all lookaheads
+    /// from this epoch to the new epoch.
+    last_epoch: u64,
 }
 
 impl<Db> Syncer<Db>
 where
-    Db: RegistryDb + Send + 'static,
+    Db: RegistryDb + Send + Sync + 'static,
 {
     /// Creates a new syncer with the given beacon and keys API URLs, and the database handle.
     pub(crate) fn new(beacon_url: impl IntoUrl, db: Db) -> (Self, SyncHandle) {
@@ -86,8 +89,14 @@ where
         let beacon_client = BeaconClient::new(beacon_url.into_url().unwrap());
 
         // TODO: read the last block number from the database and use as checkpoint for backfill
-        let syncer =
-            Self { db, state: state_tx, beacon_client, source: None, last_block_number: 0 };
+        let syncer = Self {
+            db,
+            state: state_tx,
+            beacon_client,
+            source: None,
+            last_block_number: 0,
+            last_epoch: 0,
+        };
 
         (syncer, handle)
     }
@@ -111,11 +120,6 @@ where
         })
     }
 
-    /// Backfills the registry from the last known block number to the current block number.
-    async fn backfill(&mut self) {
-        todo!()
-    }
-
     /// Handles an epoch transition event.
     async fn on_transition(&mut self, transition: EpochTransition) {
         let start = std::time::Instant::now();
@@ -131,20 +135,26 @@ where
 
         self.sync_contract_events(transition.block_number).await;
 
-        // TODO: handle failure here (currently infinitely retried inside beacon_client)
-        let Ok(lookahead) = self.beacon_client.get_lookahead(transition.epoch, true).await else {
-            error!("Failed to get lookahead for epoch {}", transition.epoch);
-            return;
-        };
+        // Sync from the last known epoch to the new epoch
+        for epoch in self.last_epoch..=transition.epoch {
+            // TODO: handle failure here (currently infinitely retried inside beacon_client)
+            let Ok(lookahead) = self.beacon_client.get_lookahead(epoch, true).await else {
+                error!("Failed to get lookahead for epoch {}", transition.epoch);
+                return;
+            };
 
-        self.sync_lookahead(lookahead).await;
+            self.sync_lookahead(lookahead).await;
+        }
+
+        // Update last epoch
+        self.last_epoch = transition.epoch;
 
         info!(elapsed = ?start.elapsed(), "Transition handled");
         let _ = self.state.send(SyncState::Synced);
     }
 
     /// Syncs contract events from the last known block number to the given block number.
-    async fn sync_contract_events(&mut self, block_number: u64) {
+    async fn sync_contract_events(&self, block_number: u64) {
         // TODO:
         // 1. Get contract logs from self.last_block_number to block_number
         // 2. Sync to database
@@ -152,7 +162,7 @@ where
     }
 
     /// Syncs the lookahead with external data sources.
-    async fn sync_lookahead(&mut self, lookahead: Vec<ProposerDuty>) {
+    async fn sync_lookahead(&self, lookahead: Vec<ProposerDuty>) {
         let pubkeys = lookahead
             .into_iter()
             .map(|duty| {
