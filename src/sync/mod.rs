@@ -167,7 +167,7 @@ where
             return;
         };
 
-        let entries = loop {
+        let mut entries = loop {
             match source.get_validators(&pubkeys).await {
                 Ok(registrations) => break registrations,
                 Err(e) => {
@@ -188,14 +188,20 @@ where
             return
         };
 
-        if pubkeys.len() != summaries.len() {
-            error!(
-                ?pubkeys,
-                ?summaries,
-                "Mismatch between queried entries and active validator summaries"
-            );
-            return;
-        }
+        // Remove entries that are not present in the beacon chain
+        entries.retain(|entry| {
+            if !summaries.iter().any(|summary| {
+                summary.validator.public_key == entry.validator_pubkey.to_consensus()
+            }) {
+                error!(
+                    "Validator not found / active in the beacon chain: {:?}",
+                    entry.validator_pubkey
+                );
+                return false;
+            }
+
+            true
+        });
 
         let mut operators = HashMap::new();
 
