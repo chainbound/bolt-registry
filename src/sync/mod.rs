@@ -177,12 +177,37 @@ where
             }
         };
 
+        let pubkeys =
+            entries.iter().map(|entry| entry.validator_pubkey.clone()).collect::<Vec<_>>();
+
         info!(count = entries.len(), elapsed = ?start.elapsed(), "Queried entries from {}", source.name());
 
+        let Ok(summaries) = self.beacon_client.get_active_validator_summaries(&pubkeys).await
+        else {
+            error!("Failed to get active validator summaries from the beacon chain");
+            return
+        };
+
+        if pubkeys.len() != summaries.len() {
+            error!(
+                ?pubkeys,
+                ?summaries,
+                "Mismatch between queried entries and active validator summaries"
+            );
+            return;
+        }
+
         let mut operators = HashMap::new();
+
         let registrations = entries
             .into_iter()
             .map(|entry| {
+                let validator_index = summaries
+                    .iter()
+                    .find(|s| s.validator.public_key == entry.validator_pubkey.to_consensus())
+                    .map(|s| s.index as u64)
+                    .expect("validator summary is present");
+
                 let operator = Operator {
                     signer: entry.operator,
                     rpc_endpoint: entry.rpc_endpoint,
@@ -191,9 +216,6 @@ where
                 };
 
                 operators.insert(entry.operator, operator);
-
-                let validator_index =
-                    todo!("Get validator index from the beacon chain OR from keys-API?");
 
                 Registration {
                     validator_pubkey: entry.validator_pubkey,
@@ -207,8 +229,15 @@ where
             .collect::<Vec<_>>();
 
         // TODO: retries on transient faults (e.g. network errors)
+        // TODO: use a DB transaction here
         if let Err(e) = self.db.register_validators(&registrations).await {
             error!(error = ?e, "Failed to register validators in the database");
+        }
+
+        for operator in operators.into_values() {
+            if let Err(e) = self.db.register_operator(operator).await {
+                error!(error = ?e, "Failed to register operator in the database");
+            }
         }
     }
 }

@@ -227,6 +227,36 @@ impl BeaconClient {
             }
         }
     }
+
+    /// Gets validator indices from their public keys.
+    /// IMPORTANT: Only returns indices for active validators ([`ValidatorStatus::Active`])
+    /// at latest known beacon state.
+    ///
+    /// Caller can check if any of the provided validator pubkeys are invalid / inactive by
+    /// comparing the length of the returned summaries.
+    ///
+    /// # Retries
+    /// This method will retry indefinitely in case of a failure.
+    pub(crate) async fn get_active_validator_summaries(
+        &self,
+        pubkeys: &[BlsPublicKey],
+    ) -> Result<Vec<ValidatorSummary>, BeaconClientError> {
+        let pubkeys = pubkeys.iter().map(|pk| pk.to_consensus().into()).collect::<Vec<_>>();
+
+        loop {
+            match self
+                .inner
+                .get_validators(StateId::Head, &pubkeys, &[ValidatorStatus::Active])
+                .await
+            {
+                Ok(validators) => break Ok(validators),
+                Err(e) => {
+                    warn!(error = ?e, "Failed to get active validators, retrying...");
+                    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
