@@ -101,8 +101,13 @@ where
         (syncer, handle)
     }
 
+    /// Sets an external data source.
     pub(crate) fn set_source<S: ExternalSource + Send + Sync + 'static>(&mut self, source: S) {
         self.source = Some(Box::new(source));
+    }
+
+    pub(crate) fn set_last_epoch(&mut self, epoch: u64) {
+        self.last_epoch = epoch;
     }
 
     /// Spawns the [`Syncer`] actor task.
@@ -300,6 +305,9 @@ mod tests {
 
             source.add_entry(entry);
         }
+
+        // Make sure we don't sync from scatch
+        syncer.set_last_epoch(epoch - 1);
 
         syncer.set_source(source);
         syncer.spawn();
