@@ -10,3 +10,6 @@
 [submodule "smart-contracts/lib/middleware-sdk"]
 	path = smart-contracts/lib/middleware-sdk
 	url = https://github.com/symbioticfi/middleware-sdk
+[submodule "smart-contracts/lib/core"]
+	path = smart-contracts/lib/core
+	url = https://github.com/symbioticfi/core
