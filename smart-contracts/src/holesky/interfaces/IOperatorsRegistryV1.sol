@@ -19,9 +19,9 @@ interface IOperatorsRegistryV1 {
         mapping(bytes32 key => Operator) _values;
     }
 
-    /// @notice Emitted when a new operator is added
+    /// @notice Emitted when a new operator is registered
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator
     /// @param restakingMiddleware The address of the restaking middleware
-    event OperatorAdded(address signer, string rpcEndpoint, address restakingMiddleware);
+    event OperatorRegistered(address signer, string rpcEndpoint, address restakingMiddleware);
 }

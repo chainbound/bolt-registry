@@ -26,7 +26,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
      *
      * Total storage slots: 50
      */
-    uint256[48] private __gap;
+    uint256[45] private __gap;
 
     // ========= Initializer & Proxy functionality ========= //
 
@@ -46,11 +46,11 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
 
     // ========= Operators functions ========= //
 
-    /// @notice Add an operator to the registry
+    /// @notice Register an operator in the registry
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator
     /// @param restakingMiddleware The address of the restaking middleware
-    function addOperator(address signer, string memory rpcEndpoint, address restakingMiddleware) public {
+    function registerOperator(address signer, string memory rpcEndpoint, address restakingMiddleware) public {
         bytes32 key = bytes32(uint256(uint160(signer)));
         require(!OPERATORS._keys.contains(key), "Operator already exists");
 
@@ -60,7 +60,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
 
         OPERATORS._keys.add(key);
         OPERATORS._values[key] = Operator(signer, rpcEndpoint, restakingMiddleware);
-        emit OperatorAdded(signer, rpcEndpoint, restakingMiddleware);
+        emit OperatorRegistered(signer, rpcEndpoint, restakingMiddleware);
     }
 
     /// @notice Returns all the operators saved in the registry
