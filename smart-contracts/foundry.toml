@@ -16,6 +16,7 @@ remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
     "@symbiotic/middleware-sdk/=lib/middleware-sdk/src/",
+    "@symbiotic/core/=lib/core/src/",
 
     # OpenZeppelin remappings contexts
     "lib/openzeppelin-contracts/:@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
