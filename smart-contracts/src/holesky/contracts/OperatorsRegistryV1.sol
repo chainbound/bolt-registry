@@ -28,7 +28,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
      */
     uint256[48] private __gap;
 
-    // ========= INITIALIZER & PROXY FUNCTIONALITY ========= //
+    // ========= Initializer & Proxy functionality ========= //
 
     /// @notice Initialize the contract
     /// @param owner The address of the owner
