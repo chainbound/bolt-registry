@@ -4,25 +4,13 @@ pragma solidity ^0.8.25;
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {IOperatorsRegistry} from "../interfaces/IOperatorsRegistry.sol";
 
-/// @title OperatorsRegistry
+/// @title OperatorsRegistryV1
 /// @notice A smart contract to store and manage Bolt operators
-contract OperatorsRegistry is OwnableUpgradeable, UUPSUpgradeable {
+contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsRegistry {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using EnumerableSet for EnumerableSet.AddressSet;
-
-    /// @notice Operator struct
-    struct Operator {
-        address signer;
-        string rpcEndpoint;
-        address restakingMiddleware;
-    }
-
-    /// @notice A map of operators with their signer address as the key
-    struct OperatorMap {
-        EnumerableSet.Bytes32Set _keys;
-        mapping(bytes32 key => Operator) _values;
-    }
 
     /// @notice The set of bolt operators indexed by their signer address
     OperatorMap private OPERATORS;
@@ -40,25 +28,23 @@ contract OperatorsRegistry is OwnableUpgradeable, UUPSUpgradeable {
      */
     uint256[48] private __gap;
 
-    /// @notice Emitted when a new operator is added
-    /// @param signer The address of the operator
-    /// @param rpcEndpoint The rpc endpoint of the operator
-    /// @param restakingMiddleware The address of the restaking middleware
-    event OperatorAdded(address signer, string rpcEndpoint, address restakingMiddleware);
+    // ========= INITIALIZER & PROXY FUNCTIONALITY ========= //
 
     /// @notice Initialize the contract
+    /// @param owner The address of the owner
     function initialize(
         address owner
     ) public initializer {
         __Ownable_init(owner);
     }
 
-    /// @notice Initialize the contract
+    /// @notice Upgrade the contract
+    /// @param newImplementation The address of the new implementation
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}
 
-    // === Operators ===
+    // ========= Operators functions ========= //
 
     /// @notice Add an operator to the registry
     /// @param signer The address of the operator
@@ -99,7 +85,17 @@ contract OperatorsRegistry is OwnableUpgradeable, UUPSUpgradeable {
         return OPERATORS._values[key];
     }
 
-    // === Restaking Middlewres ===
+    /// @notice Returns true if the given address is an operator in the registry
+    /// @param signer The address of the operator
+    /// @return isOperator True if the address is an operator, false otherwise
+    function isOperator(
+        address signer
+    ) public view returns (bool) {
+        bytes32 key = bytes32(uint256(uint160(signer)));
+        return OPERATORS._keys.contains(key);
+    }
+
+    // ========= Restaking Middlewres ========= //
 
     /// @notice Add a restaking middleware contract address to the registry
     /// @param middleware The address of the restaking middleware
