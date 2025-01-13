@@ -24,7 +24,7 @@ contract DeployRegistry is Script {
             (
                 admin,
                 // TODO
-                readerHelper,
+                readerHelper
             )
         );
     }
