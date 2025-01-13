@@ -4,11 +4,11 @@ pragma solidity ^0.8.25;
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {IOperatorsRegistry} from "../interfaces/IOperatorsRegistry.sol";
+import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
 
 /// @title OperatorsRegistryV1
 /// @notice A smart contract to store and manage Bolt operators
-contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsRegistry {
+contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsRegistryV1 {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using EnumerableSet for EnumerableSet.AddressSet;
 

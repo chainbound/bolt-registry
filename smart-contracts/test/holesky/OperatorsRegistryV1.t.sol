@@ -2,12 +2,12 @@
 pragma solidity ^0.8.25;
 
 import {Test, console} from "forge-std/Test.sol";
-import {OperatorsRegistryV1} from "../src/holesky/contracts/OperatorsRegistryV1.sol";
+import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
 
 contract OperatorsRegistryTest is Test {
-    OperatorsRegistry registry;
+    OperatorsRegistryV1 registry;
 
     function setUp() public {
-        registry = new OperatorsRegistry();
+        registry = new OperatorsRegistryV1();
     }
 }
