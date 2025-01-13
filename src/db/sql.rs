@@ -1,11 +1,13 @@
+use std::sync::{atomic::AtomicU64, Arc};
+
 use alloy::primitives::Address;
 use sqlx::Postgres;
-use tracing::info;
+use tracing::{debug, info};
 
 use super::{
     types::{OperatorRow, ValidatorRegistrationRow},
     BlsPublicKey, DbResult, Deregistration, Operator, Registration, RegistryDb, RegistryEntry,
-    SyncStateUpdate,
+    SyncStateUpdate, SyncTransaction,
 };
 
 /// Generic SQL database implementation, that supports all `SQLx` backends.
@@ -16,13 +18,15 @@ pub(crate) struct SQLDb<Db: sqlx::Database> {
     /// Cloning `Pool` is cheap as it is simply a
     /// reference-counted handle to the inner pool state.
     conn: sqlx::Pool<Db>,
+    /// ID counter for transactions.
+    next_id: Arc<AtomicU64>,
 }
 
 impl SQLDb<sqlx::Postgres> {
     /// Create a new Postgres database connection, and run DDL queries.
     pub(crate) async fn new(url: &str) -> Result<Self, sqlx::Error> {
         let conn = sqlx::postgres::PgPoolOptions::new().max_connections(10).connect(url).await?;
-        let this = Self { conn };
+        let this = Self { conn, next_id: Default::default() };
 
         this.ddl().await?;
 
@@ -42,12 +46,100 @@ impl SQLDb<sqlx::Postgres> {
 // Deriving `Clone` on `SQLDb` is not enough because of the generic type parameter.
 impl<Db: sqlx::Database> Clone for SQLDb<Db> {
     fn clone(&self) -> Self {
-        Self { conn: self.conn.clone() }
+        Self { conn: self.conn.clone(), next_id: Arc::clone(&self.next_id) }
+    }
+}
+
+pub(crate) struct SQLSyncTransaction {
+    id: u64,
+    transaction: sqlx::Transaction<'static, Postgres>,
+}
+
+#[async_trait::async_trait]
+impl SyncTransaction for SQLSyncTransaction {
+    async fn register_validators(&mut self, registrations: &[Registration]) -> DbResult<()> {
+        let mut rows_affected = 0;
+        for registration in registrations {
+            let result = sqlx::query(
+                "
+                INSERT INTO validator_registrations (pubkey, index, signature, expiry, operator, priority, source, last_update)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+                "
+            )
+            .bind(registration.validator_pubkey.serialize())
+            .bind(registration.validator_index as i64)
+            .bind(registration.signature.as_ref().map(|s| s.serialize()))
+            .bind(registration.expiry.to_string())
+            .bind(registration.operator.to_vec())
+            .bind(0) // TODO: priority
+            .bind("none") // TODO: source
+            .execute(&mut *self.transaction).await?.rows_affected();
+
+            rows_affected += result;
+        }
+
+        debug!(transaction_id = self.id, rows_affected, "register_validators");
+
+        Ok(())
+    }
+
+    async fn register_operator(&mut self, operator: Operator) -> DbResult<()> {
+        let rows_affected = sqlx::query(
+            "
+            INSERT INTO operators (signer, rpc, protocol, source, collateral_tokens, collateral_amounts, last_update)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            ",
+        )
+        .bind(operator.signer.to_vec())
+        .bind(operator.rpc_endpoint.to_string())
+        .bind("none") // TODO: protocol
+        .bind("none") // TODO: source
+        // parse arrays as bytea[] with address bytes and little endian u256 bytes
+        .bind(operator.collateral_tokens.into_iter().map(|a| a.to_vec()).collect::<Vec<_>>())
+        .bind(operator.collateral_amounts.into_iter().map(|a| a.to_le_bytes_vec()).collect::<Vec<_>>())
+        .execute(&mut *self.transaction)
+        .await?
+        .rows_affected();
+
+        debug!(transaction_id = self.id, rows_affected, "register_operator");
+
+        Ok(())
+    }
+
+    async fn commit(mut self, state: SyncStateUpdate) -> DbResult<()> {
+        sqlx::query(
+            "
+                INSERT INTO sync_state (block_number, epoch, slot)
+                VALUES ($1, $2, $3)
+                ON CONFLICT (block_number)
+                DO UPDATE SET epoch = $2, slot = $3
+                ",
+        )
+        .bind(state.block_number as i64)
+        .bind(state.epoch as i64)
+        .bind(state.slot as i64)
+        .execute(&mut *self.transaction)
+        .await?;
+
+        self.transaction.commit().await?;
+
+        debug!(transaction_id = self.id, "commit");
+
+        Ok(())
     }
 }
 
 #[async_trait::async_trait]
 impl RegistryDb for SQLDb<Postgres> {
+    type SyncTransaction = SQLSyncTransaction;
+
+    async fn begin_sync(&self) -> DbResult<Self::SyncTransaction> {
+        let transaction = self.conn.begin().await?;
+        let id = self.next_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+        Ok(SQLSyncTransaction { id, transaction })
+    }
+
     async fn register_validators(&self, registrations: &[Registration]) -> DbResult<()> {
         let mut transaction = self.conn.begin().await?;
 

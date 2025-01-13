@@ -11,7 +11,7 @@ use crate::primitives::{
     SyncStateUpdate,
 };
 
-use super::{BlsPublicKey, DbResult, Operator, Registration, RegistryDb};
+use super::{BlsPublicKey, DbResult, Operator, Registration, RegistryDb, SyncTransaction};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct InMemoryDb {
@@ -21,8 +21,50 @@ pub(crate) struct InMemoryDb {
     sync_state: Arc<RwLock<SyncStateUpdate>>,
 }
 
+pub(crate) struct InMemorySyncTransaction {
+    validator_registrations: Arc<RwLock<HashMap<BlsPublicKey, Registration>>>,
+    operator_registrations: Arc<RwLock<HashMap<Address, Operator>>>,
+    sync_state: Arc<RwLock<SyncStateUpdate>>,
+}
+
+#[async_trait::async_trait]
+impl SyncTransaction for InMemorySyncTransaction {
+    async fn register_validators(&mut self, registrations: &[Registration]) -> DbResult<()> {
+        let mut cache = self.validator_registrations.write().unwrap();
+        for registration in registrations {
+            cache.insert(registration.validator_pubkey.clone(), registration.clone());
+        }
+
+        Ok(())
+    }
+
+    async fn register_operator(&mut self, operator: Operator) -> DbResult<()> {
+        let mut operators = self.operator_registrations.write().unwrap();
+        operators.insert(operator.signer, operator);
+
+        Ok(())
+    }
+
+    async fn commit(self, state: SyncStateUpdate) -> DbResult<()> {
+        let mut sync_state = self.sync_state.write().unwrap();
+        *sync_state = state;
+
+        Ok(())
+    }
+}
+
 #[async_trait::async_trait]
 impl RegistryDb for InMemoryDb {
+    type SyncTransaction = InMemorySyncTransaction;
+
+    async fn begin_sync(&self) -> DbResult<Self::SyncTransaction> {
+        Ok(InMemorySyncTransaction {
+            validator_registrations: Arc::clone(&self.validator_registrations),
+            operator_registrations: Arc::clone(&self.operator_registrations),
+            sync_state: Arc::clone(&self.sync_state),
+        })
+    }
+
     async fn register_operator(&self, operator: Operator) -> DbResult<()> {
         info!(signer = %operator.signer, "InMemoryDb: register_operator");
 

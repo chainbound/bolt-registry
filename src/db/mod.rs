@@ -40,9 +40,29 @@ pub(crate) enum DbError {
     MissingField(&'static str),
 }
 
+/// Sync transaction trait. Provides a way to atomically commit any mutations and finalize
+/// with the new sync state.
+#[async_trait::async_trait]
+pub(crate) trait SyncTransaction {
+    /// Register validators in the database.
+    async fn register_validators(&mut self, registrations: &[Registration]) -> DbResult<()>;
+
+    /// Register an operator in the database.
+    async fn register_operator(&mut self, operator: Operator) -> DbResult<()>;
+
+    /// Commit and finalize the sync transaction with the updated state.
+    async fn commit(self, state: SyncStateUpdate) -> DbResult<()>;
+}
+
 /// Registry database trait.
 #[async_trait::async_trait]
-pub(crate) trait RegistryDb: Clone {
+pub(crate) trait RegistryDb: Clone + Send + Sync + 'static {
+    type SyncTransaction: SyncTransaction + Send;
+
+    /// Begin a new sync transaction. A sync transaction groups database mutations together in a
+    /// single atomic operation.
+    async fn begin_sync(&self) -> DbResult<Self::SyncTransaction>;
+
     /// Register validators in the database.
     async fn register_validators(&self, registrations: &[Registration]) -> DbResult<()>;
 

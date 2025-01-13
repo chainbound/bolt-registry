@@ -29,7 +29,7 @@ pub(crate) struct Registry<Db> {
 
 impl<Db> Registry<Db>
 where
-    Db: RegistryDb + Send + Sync + Clone + 'static,
+    Db: RegistryDb,
 {
     pub(crate) fn new(config: Config, db: Db, beacon: BeaconClient) -> Self {
         let kapi = KeysApi::new(&config.keys_api_url);
