@@ -22,7 +22,9 @@ remappings = [
 
     # OpenZeppelin remappings contexts
     "lib/openzeppelin-contracts/:@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "lib/openzeppelin-contracts-upgradeable/:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/"
+    "lib/openzeppelin-contracts-upgradeable/:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+
+    "lib/middleware-sdk/:@symbiotic/=lib/core/src/"
 ]
 
 [rpc_endpoints]
