@@ -58,6 +58,8 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
         require(bytes(rpcEndpoint).length > 0, "Invalid rpc endpoint");
         require(RESTAKING_MIDDLEWARES.contains(restakingMiddleware), "Invalid restaking middleware");
 
+        // Validate the operator by calling the middleware
+
         OPERATORS._keys.add(key);
         OPERATORS._values[key] = Operator(signer, rpcEndpoint, restakingMiddleware);
         emit OperatorRegistered(signer, rpcEndpoint, restakingMiddleware);
