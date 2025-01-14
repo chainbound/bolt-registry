@@ -5,9 +5,12 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeab
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 
 import {IVault} from "@symbiotic/core/interfaces/vault/IVault.sol";
+import {IEntity} from "@symbiotic/core/interfaces/common/IEntity.sol";
+import {IOperatorSpecificDelegator} from "@symbiotic/core/interfaces/delegator/IOperatorSpecificDelegator.sol";
 import {IRegistry} from "@symbiotic/core/interfaces/common/IRegistry.sol";
 import {Subnetwork} from "@symbiotic/core/contracts/libraries/Subnetwork.sol";
 import {INetworkRegistry} from "@symbiotic/core/interfaces/INetworkRegistry.sol";
@@ -34,6 +37,7 @@ import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/Pausea
 contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     using Subnetwork for address;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableMap for EnumerableMap.AddressToAddressMap;
     using PauseableEnumerableSet for PauseableEnumerableSet.AddressSet;
 
     // ================ STORAGE ================== //
@@ -50,6 +54,9 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice The duration of the slashing window.
     uint48 public SLASHING_WINDOW;
 
+    /// @notice The duration of ena epoch.
+    uint48 public EPOCH_DURATION;
+
     /// @notice The Symbiotic vault registry.
     address public VAULT_REGISTRY;
 
@@ -59,10 +66,23 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice The Symbiotic operator network opt-in service.
     address public OPERATOR_NET_OPTIN;
 
+    /// @notice Default subnetwork.
+    uint96 internal constant DEFAULT_SUBNETWORK = 0;
+
     /**
      * @notice The set of whitelisted vaults for the network.
      */
     PauseableEnumerableSet.AddressSet private _vaults;
+
+    /**
+     * @notice The set of vaults for each operator.
+     */
+    mapping(address => PauseableEnumerableSet.AddressSet) _operatorVaults;
+
+    /**
+     * @notice Vaults to operators mapping.
+     */
+    EnumerableMap.AddressToAddressMap _vaultOperator;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -74,11 +94,19 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
      */
     uint256[49] private __gap;
 
+    enum DelegatorType {
+        FULL_RESTAKE,
+        NETWORK_RESTAKE,
+        OPERATOR_SPECIFIC,
+        OPERATOR_NETWORK_SPECIFIC
+    }
+
     /// =================== ERRORS ====================== //
     error NotVault();
     error VaultNotInitialized();
     error VaultAlreadyRegistered();
     error VaultNotRegistered();
+    error NotOperatorSpecificVault();
 
     /// =================== MODIFIERS =================== //
 
@@ -119,6 +147,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
 
         BOLT_REGISTRY = boltRegistry;
         SLASHING_WINDOW = slashingWindow;
+        EPOCH_DURATION = epochDuration;
         VAULT_REGISTRY = vaultRegistry;
         OPERATOR_REGISTRY = operatorRegistry;
         OPERATOR_NET_OPTIN = operatorNetOptin;
@@ -164,7 +193,9 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
      * @param operator The address of the operator
      * @param vault The address of the vault
      */
-    function registerOperator(address operator, address vault) public onlyBolt {}
+    function registerOperator(address operator, address vault) public onlyBolt {
+        _validateOperatorVault(operator, vault);
+    }
 
     /**
      * @notice Deregister an operator from the registry
@@ -244,9 +275,9 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
             revert VaultAlreadyRegistered();
         }
 
-        uint48 vaultEpoch = IVault(vault).epochDuration();
-
         // TODO: slasher checks:
+
+        // uint48 vaultEpoch = IVault(vault).epochDuration();
         // address slasher = IVault(vault).slasher();
         // if (slasher != address(0)) {
         //     uint64 slasherType = IEntity(slasher).TYPE();
@@ -257,7 +288,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         //     }
         // }
 
-        // if (vaultEpoch < _SLASHING_WINDOW()) {
+        // if (vaultEpoch < SLASHING_WINDOW) {
         //     revert VaultEpochTooShort();
         // }
     }
