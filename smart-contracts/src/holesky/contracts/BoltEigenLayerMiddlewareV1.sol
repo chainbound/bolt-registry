@@ -83,7 +83,9 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
     /// @param operator The operator address to get the collaterals and amounts staked for
     /// @return collaterals The collaterals staked by the operator
     /// @dev Assumes that the operator is registered and enabled
-    function getOperatorCollaterals(address operator) public view returns (address[] memory, uint256[] memory) {
+    function getOperatorCollaterals(
+        address operator
+    ) public view returns (address[] memory, uint256[] memory) {
         address[] memory collateralTokens = new address[](whitelistedStrategies.length());
         uint256[] memory amounts = new uint256[](whitelistedStrategies.length());
 
@@ -99,7 +101,7 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
         // get the collateral tokens and amounts for the operator across all strategies
         for (uint256 i = 0; i < strategies.length(); i++) {
             collateralTokens[i] = address(strategies[i].underlyingToken());
-            amounts[i] = strategy.sharesToUnderlyingView(shares);
+            amounts[i] = strategies[i].sharesToUnderlyingView(shares);
         }
 
         return (collateralTokens, amounts);
@@ -108,7 +110,7 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
     /// @notice Slash an operator in the AVS
     /// @param params The parameters for slashing the operator
     function slashOperator(
-        SlashingParams calldata params
+        IAllocationManagerTypes.SlashingParams calldata params
     ) public {
         // TODO: Implement slashing logic
 
