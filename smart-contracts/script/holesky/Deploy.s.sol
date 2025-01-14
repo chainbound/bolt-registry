@@ -19,30 +19,8 @@ contract DeployRegistry is Script {
         Options memory opts;
         opts.unsafeSkipAllChecks = true;
 
-        // function initialize(
-        //     address owner,
-        //     address network,
-        //     address networkRegistry,
-        //     uint48 slashingWindow,
-        //     address vaultRegistry,
-        //     address operatorRegistry,
-        //     address operatorNetOptin,
-        //     address reader
-        // ) public initializer {
-        bytes memory initParams = abi.encodeCall(
-            SymbioticMiddlewareV1.initialize,
-            (
-                admin,
-                admin,
-                admin,
-                0,
-                admin,
-                admin,
-                admin,
-                // TODO
-                readerHelper
-            )
-        );
+        // TODO:
+        bytes memory initParams = abi.encodeCall(SymbioticMiddlewareV1.initialize, ());
 
         address middleware = Upgrades.deployUUPSProxy("SymbioticMiddlewareV1", initParams, opts);
         console.log("Deployed middleware at:", middleware);

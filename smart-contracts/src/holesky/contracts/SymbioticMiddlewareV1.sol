@@ -2,17 +2,18 @@
 pragma solidity ^0.8.25;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import {Operators} from "@symbiotic/middleware-sdk/extensions/operators/Operators.sol";
-import {SharedVaults} from "@symbiotic/middleware-sdk/extensions/SharedVaults.sol";
-import {KeyManagerAddress} from "@symbiotic/middleware-sdk/extensions/managers/keys/KeyManagerAddress.sol";
-import {EqualStakePower} from "@symbiotic/middleware-sdk/extensions/managers/stake-powers/EqualStakePower.sol";
-import {EpochCapture} from "@symbiotic/middleware-sdk/extensions/managers/capture-timestamps/EpochCapture.sol";
-import {ECDSASig} from "@symbiotic/middleware-sdk/extensions/managers/sigs/ECDSASig.sol";
-import {OwnableAccessManager} from "@symbiotic/middleware-sdk/extensions/managers/access/OwnableAccessManager.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 
+import {IVault} from "@symbiotic/core/interfaces/vault/IVault.sol";
+import {IRegistry} from "@symbiotic/core/interfaces/common/IRegistry.sol";
 import {Subnetwork} from "@symbiotic/core/contracts/libraries/Subnetwork.sol";
 import {INetworkRegistry} from "@symbiotic/core/interfaces/INetworkRegistry.sol";
+import {INetworkMiddlewareService} from "@symbiotic/core/interfaces/service/INetworkMiddlewareService.sol";
+
+import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
 /**
  * @title SymbioticMiddlewareV1
@@ -30,31 +31,56 @@ import {INetworkRegistry} from "@symbiotic/core/interfaces/INetworkRegistry.sol"
  * For more information on extensions, see <https://docs.symbiotic.fi/middleware-sdk/extensions>.
  * All public view functions are implemented in the `BaseMiddlewareReader`: <https://docs.symbiotic.fi/middleware-sdk/api-reference/middleware/BaseMiddlewareReader>
  */
-contract SymbioticMiddlewareV1 is
-    Operators,
-    KeyManagerAddress,
-    ECDSASig,
-    EqualStakePower,
-    EpochCapture,
-    OwnableAccessManager,
-    UUPSUpgradeable
-{
+contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     using Subnetwork for address;
+    using EnumerableSet for EnumerableSet.AddressSet;
+    using PauseableEnumerableSet for PauseableEnumerableSet.AddressSet;
+
+    // ================ STORAGE ================== //
+    //
+    // Most of these constants replicate view methods in the BaseMiddlewareReader.
+    // See <https://docs.symbiotic.fi/middleware-sdk/api-reference/middleware/BaseMiddlewareReader> for more information.
+
+    /// @notice The address of the bolt registry
+    address public BOLT_REGISTRY;
+
+    /// @notice The Symbiotic network: address(this)
+    address public NETWORK;
+
+    /// @notice The duration of the slashing window.
+    uint48 public SLASHING_WINDOW;
+
+    /// @notice The Symbiotic vault registry.
+    address public VAULT_REGISTRY;
+
+    /// @notice The Symbiotic operator registry.
+    address public OPERATOR_REGISTRY;
+
+    /// @notice The Symbiotic operator network opt-in service.
+    address public OPERATOR_NET_OPTIN;
 
     /**
-     * @notice The address of the bolt operators registry.
+     * @notice The set of whitelisted vaults for the network.
      */
-    address public BOLT_REGISTRY;
+    PauseableEnumerableSet.AddressSet private _vaults;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shifting down storage in the inheritance chain.
+     * variables without shift_initializeNetworkage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      * This can be validated with the Openzeppelin Foundry Upgrades toolkit.
      *
      * Total storage slots: 50
      */
     uint256[49] private __gap;
+
+    /// =================== ERRORS ====================== //
+    error NotVault();
+    error VaultNotInitialized();
+    error VaultAlreadyRegistered();
+    error VaultNotRegistered();
+
+    /// =================== MODIFIERS =================== //
 
     /**
      * @notice Modifier to restrict access to the bolt registry.
@@ -68,46 +94,52 @@ contract SymbioticMiddlewareV1 is
     /**
      * @notice Constructor for initializing the SymbioticMiddlewareV1 contract
      * @param owner The address of the owner
-     * @param networkRegistry The address of the network registry
+     * @param networkMiddlewareService The address of the network middleware service
      * @param slashingWindow The duration of the slashing window (unused in V1)
      * @param vaultRegistry The address of the vault registry
      * @param operatorRegistry The address of the operator registry
      * @param operatorNetOptin The address of the operator network opt-in service
-     * @param reader The address of the reader contract used for delegatecall
      * @dev We put all of the contract dependencies in the constructor to make it easier to (re-)deploy
      *      when dependencies are upgraded.
      */
     function initialize(
         address owner,
         address boltRegistry,
-        address networkRegistry,
+        address networkMiddlewareService,
         uint48 epochDuration,
         uint48 slashingWindow,
         address vaultRegistry,
         address operatorRegistry,
-        address operatorNetOptin,
-        address reader
+        address operatorNetOptin
     ) public initializer {
-        // Register the network
-        // IMPORTANT NOTE: Don't do this in any upgraded initializers or the initializer
-        // will revert!
-        INetworkRegistry(networkRegistry).registerNetwork();
+        __Ownable_init(owner);
 
-        // Initialize middleware
-        __BaseMiddleware_init(address(this), slashingWindow, vaultRegistry, operatorRegistry, operatorNetOptin, reader);
-
-        // Initialize owner access
-        __OwnableAccessManager_init(owner);
-
-        // Initialize the epoch capture
-        __EpochCapture_init(epochDuration);
+        // Initialize the network with Symbiotic
+        _initializeNetwork(networkMiddlewareService);
 
         BOLT_REGISTRY = boltRegistry;
+        SLASHING_WINDOW = slashingWindow;
+        VAULT_REGISTRY = vaultRegistry;
+        OPERATOR_REGISTRY = operatorRegistry;
+        OPERATOR_NET_OPTIN = operatorNetOptin;
     }
 
     function _authorizeUpgrade(
         address newImplementation
-    ) internal override checkAccess {}
+    ) internal override onlyOwner {}
+
+    function _initializeNetwork(
+        address networkMiddlewareService
+    ) public onlyOwner {
+        address networkRegistry = INetworkMiddlewareService(networkMiddlewareService).NETWORK_REGISTRY();
+
+        INetworkRegistry(networkRegistry).registerNetwork();
+
+        // Set the middleware
+        INetworkMiddlewareService(networkMiddlewareService).setMiddleware(address(this));
+
+        NETWORK = address(this);
+    }
 
     // TODO:
     // - Key management
@@ -120,5 +152,142 @@ contract SymbioticMiddlewareV1 is
     //     - Shared vault registration / deregistration
     //     - Vault pausing / unpausing
     //     - Vault collateral tracking
-    //     -
+    //     - Vault whitelisting
+
+    // ================ OPERATORS ===================== //
+    //
+    // These functions are only callable by the bolt registry.
+    // All external operator management is done through the bolt registry.
+
+    /**
+     * @notice Register an operator in the registry
+     * @param operator The address of the operator
+     * @param vault The address of the vault
+     */
+    function registerOperator(address operator, address vault) public onlyBolt {}
+
+    /**
+     * @notice Deregister an operator from the registry
+     * @param operator The address of the operator
+     */
+    function deregisterOperator(
+        address operator
+    ) public onlyBolt {}
+
+    // ================ VAULTS ===================== //
+
+    /**
+     * @notice Register a vault in the registry
+     * @param vault The address of the vault
+     */
+    function registerVault(
+        address vault
+    ) public onlyOwner {
+        // Validate the vault
+        _validateVault(vault);
+
+        // Registers and enables the vault
+        _vaults.register(_now(), vault);
+    }
+
+    /**
+     * @notice Deregister a vault from the registry
+     * @param vault The address of the vault
+     */
+    function deregisterVault(
+        address vault
+    ) public onlyOwner {
+        if (!_vaults.contains(vault)) {
+            revert VaultNotRegistered();
+        }
+
+        _vaults.unregister(_now(), SLASHING_WINDOW, vault);
+    }
+
+    /**
+     * @notice Pause a vault
+     * @param vault The address of the vault
+     */
+    function pauseVault(
+        address vault
+    ) public onlyOwner {
+        _vaults.pause(_now(), vault);
+    }
+
+    /**
+     * @notice Unpause a vault
+     * @param vault The address of the vault
+     */
+    function unpauseVault(
+        address vault
+    ) public onlyOwner {
+        _vaults.unpause(_now(), SLASHING_WINDOW, vault);
+    }
+
+    /**
+     * @notice Validates if a vault is properly initialized and registered
+     * @param vault The vault address to validate
+     * @dev Adapted from https://github.com/symbioticfi/middleware-sdk/blob/68334572da818cc547aca8e729321e98df97a2a8/src/managers/VaultManager.sol
+     */
+    function _validateVault(
+        address vault
+    ) private view {
+        if (!IRegistry(VAULT_REGISTRY).isEntity(vault)) {
+            revert NotVault();
+        }
+
+        if (!IVault(vault).isInitialized()) {
+            revert VaultNotInitialized();
+        }
+
+        if (_vaults.contains(vault)) {
+            revert VaultAlreadyRegistered();
+        }
+
+        uint48 vaultEpoch = IVault(vault).epochDuration();
+
+        // TODO: slasher checks:
+        // address slasher = IVault(vault).slasher();
+        // if (slasher != address(0)) {
+        //     uint64 slasherType = IEntity(slasher).TYPE();
+        //     if (slasherType == uint64(SlasherType.VETO)) {
+        //         vaultEpoch -= IVetoSlasher(slasher).vetoDuration();
+        //     } else if (slasherType > uint64(SlasherType.VETO)) {
+        //         revert UnknownSlasherType();
+        //     }
+        // }
+
+        // if (vaultEpoch < _SLASHING_WINDOW()) {
+        //     revert VaultEpochTooShort();
+        // }
+    }
+
+    function _validateOperatorVault(address operator, address vault) internal view {
+        address delegator = IVault(vault).delegator();
+        uint64 delegatorType = IEntity(delegator).TYPE();
+        if (
+            (
+                delegatorType != uint64(DelegatorType.OPERATOR_SPECIFIC)
+                    && delegatorType != uint64(DelegatorType.OPERATOR_NETWORK_SPECIFIC)
+            ) || IOperatorSpecificDelegator(delegator).operator() != operator
+        ) {
+            revert NotOperatorSpecificVault();
+        }
+    }
+
+    /**
+     * @notice Returns the current timestamp minus 1 second.
+     * @return timestamp The current timestamp minus 1 second.
+     */
+    function getCaptureTimestamp() public view returns (uint48 timestamp) {
+        return _now() - 1;
+    }
+
+    /**
+     * @notice Returns the current timestamp
+     * @return timestamp The current timestamp
+     */
+    function _now() internal view returns (uint48) {
+        return Time.timestamp();
+    }
 }
