@@ -3,15 +3,20 @@ pragma solidity ^0.8.27;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import {
+    IAllocationManager, IAllocationManagerTypes
+} from "@eigenlayer/src/contracts/interfaces/IAllocationManager.sol";
 import {IDelegationManager} from "@eigenlayer/src/contracts/interfaces/IDelegationManager.sol";
-import {IllocationManager} from "@eigenlayer/src/contracts/interfaces/IAllocationManager.sol";
 import {IStrategyManager} from "@eigenlayer/src/contracts/interfaces/IStrategyManager.sol";
 import {IAVSRegistrar} from "@eigenlayer/src/contracts/interfaces/IAVSRegistrar.sol";
 import {IStrategy} from "@eigenlayer/src/contracts/interfaces/IStrategy.sol";
 
 /// @title BoltEigenLayerMiddlewareV1
 contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegistrar {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     /// @notice Address of the EigenLayer Allocation Manager contract.
     IAllocationManager public ALLOCATION_MANAGER;
 
@@ -24,6 +29,9 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
     /// @notice The name hash of the middleware
     bytes32 public NAME_HASH;
 
+    /// @notice The list of whitelisted strategies for this AVS
+    EnumerableSet.AddressSet internal whitelistedStrategies;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
@@ -32,7 +40,15 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
      *
      * Total storage slots: 50
      */
-    uint256[46] private __gap;
+    uint256[45] private __gap;
+
+    // ========= Events ========= //
+
+    /// @notice Emitted when a strategy is whitelisted
+    event StrategyAddedToWhitelist(address strategy);
+
+    /// @notice Emitted when a strategy is removed from the whitelist
+    event StrategyRemovedFromWhitelist(address strategy);
 
     // ========= Initializer & Proxy functionality ========= //
 
@@ -45,7 +61,7 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
         address owner,
         IAllocationManager _eigenlayerAllocationManager,
         IDelegationManager _eigenlayerDelegationManager,
-        IStrategyManager _eigenlayerStrategyManager,
+        IStrategyManager _eigenlayerStrategyManager
     ) public initializer {
         __Ownable_init(owner);
 
@@ -65,10 +81,12 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
 
     /// @notice Slash an operator in the AVS
     /// @param params The parameters for slashing the operator
-    function slashOperator(SlashingParams calldata params) public {
+    function slashOperator(
+        SlashingParams calldata params
+    ) public {
         // TODO: Implement slashing logic
 
-        // if the call proceeds to the AllocationManager, 
+        // if the call proceeds to the AllocationManager,
         // the operator will be slashed immediately and irreversibly.
         ALLOCATION_MANAGER.slashOperator(address(this), params);
     }
@@ -96,15 +114,45 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
         // called by operators.
 
         // Failure does nothing here: if this call reverts the deregistration will still go through.
-        // this is done for security reasons, to prevent AVSs from being able to maliciously 
+        // this is done for security reasons, to prevent AVSs from being able to maliciously
         // prevent operators from deregistering.
     }
 
     // ========= Admin functions ========= //
 
+    /// @notice Add a strategy to the whitelist
+    /// @param strategy The strategy to add
+    function addStrategyToWhitelist(
+        address strategy
+    ) public onlyOwner {
+        require(strategy != address(0), "Invalid strategy address");
+        require(!whitelistedStrategies.contains(strategy), "Strategy already whitelisted");
+        require(STRATEGY_MANAGER.strategyIsWhitelistedForDeposit(IStrategy(strategy)), "Strategy not allowed");
+
+        whitelistedStrategies.add(strategy);
+        emit StrategyAddedToWhitelist(strategy);
+    }
+
+    /// @notice Remove a strategy from the whitelist
+    /// @param strategy The strategy to remove
+    function removeStrategyFromWhitelist(
+        address strategy
+    ) public onlyOwner {
+        require(whitelistedStrategies.contains(strategy), "Strategy not whitelisted");
+
+        whitelistedStrategies.remove(strategy);
+        emit StrategyRemovedFromWhitelist(strategy);
+    }
+
     /// @notice Create new operator sets for this AVS
     /// @param params The parameters for creating the operator sets
-    function createOperatorSets(CreateSetParams[] calldata params) public onlyOwner {
+    function createOperatorSets(
+        IAllocationManagerTypes.CreateSetParams[] calldata params
+    ) public onlyOwner {
+        for (uint256 i = 0; i < params.length; i++) {
+            _checkAreStrategiesWhitelisted(params[i].strategies);
+        }
+
         ALLOCATION_MANAGER.createOperatorSets(address(this), params);
     }
 
@@ -112,6 +160,8 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
     /// @param operatorSetId The ID of the operator set to add strategies to
     /// @param strategies The strategies to add
     function addStrategiesToOperatorSet(uint32 operatorSetId, IStrategy[] calldata strategies) public onlyOwner {
+        _checkAreStrategiesWhitelisted(strategies);
+
         ALLOCATION_MANAGER.addStrategiesToOperatorSet(address(this), operatorSetId, strategies);
     }
 
@@ -124,7 +174,34 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
 
     /// @notice Update the metadata URI for this AVS
     /// @param metadataURI The new metadata URI
-    function updateAVSMetadataURI(string calldata metadataURI) public onlyOwner {
+    function updateAVSMetadataURI(
+        string calldata metadataURI
+    ) public onlyOwner {
         ALLOCATION_MANAGER.updateAVSMetadataURI(address(this), metadataURI);
+    }
+
+    // ========= Getter functions ========= //
+
+    /// @notice Get the list of whitelisted strategies for this AVS
+    /// @return The list of whitelisted strategies
+    function getWhitelistedStrategies() public view returns (address[] memory) {
+        address[] memory strategies = new address[](whitelistedStrategies.length());
+        for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
+            strategies[i] = whitelistedStrategies.at(i);
+        }
+        return strategies;
+    }
+
+    // ========== Internal helpers ========== //
+
+    /// @notice Check if ALL the given strategies are whitelisted.
+    /// If any of the strategies are not whitelisted, the function will revert.
+    /// @param strategies The strategies to check
+    function _checkAreStrategiesWhitelisted(
+        IStrategy[] calldata strategies
+    ) internal view {
+        for (uint256 i = 0; i < strategies.length; i++) {
+            require(whitelistedStrategies.contains(address(strategies[i])), "Strategy not whitelisted");
+        }
     }
 }
