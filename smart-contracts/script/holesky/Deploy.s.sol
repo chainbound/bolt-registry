@@ -11,7 +11,7 @@ import {BaseMiddlewareReader} from "@symbiotic/middleware-sdk/middleware/BaseMid
 import {SymbioticMiddlewareV1} from "../../src/holesky/contracts/SymbioticMiddlewareV1.sol";
 
 contract DeployRegistry is Script {
-    function main() public {
+    function run() public {
         address admin = msg.sender;
         address readerHelper = address(new BaseMiddlewareReader());
 
@@ -19,13 +19,32 @@ contract DeployRegistry is Script {
         Options memory opts;
         opts.unsafeSkipAllChecks = true;
 
+        // function initialize(
+        //     address owner,
+        //     address network,
+        //     address networkRegistry,
+        //     uint48 slashingWindow,
+        //     address vaultRegistry,
+        //     address operatorRegistry,
+        //     address operatorNetOptin,
+        //     address reader
+        // ) public initializer {
         bytes memory initParams = abi.encodeCall(
             SymbioticMiddlewareV1.initialize,
             (
+                admin,
+                admin,
+                admin,
+                0,
+                admin,
+                admin,
                 admin,
                 // TODO
                 readerHelper
             )
         );
+
+        address middleware = Upgrades.deployUUPSProxy("SymbioticMiddlewareV1", initParams, opts);
+        console.log("Deployed middleware at:", middleware);
     }
 }
