@@ -79,6 +79,32 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
 
     // ========= AVS functions ========= //
 
+    /// @notice Get the collaterals and amounts staked by an operator across the whitelisted strategies
+    /// @param operator The operator address to get the collaterals and amounts staked for
+    /// @return collaterals The collaterals staked by the operator
+    /// @dev Assumes that the operator is registered and enabled
+    function getOperatorCollaterals(address operator) public view returns (address[] memory, uint256[] memory) {
+        address[] memory collateralTokens = new address[](whitelistedStrategies.length());
+        uint256[] memory amounts = new uint256[](whitelistedStrategies.length());
+
+        // cast strategies to IStrategy; this should be zero-cost but Solidity doesn't allow it directly
+        IStrategy[] memory strategies = new IStrategy[](whitelistedStrategies.length());
+        for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
+            strategies[i] = IStrategy(whitelistedStrategies.at(i));
+        }
+
+        // get the shares of the operator across all strategies
+        uint256 shares = DELEGATION_MANAGER.getOperatorShares(operator, strategies);
+
+        // get the collateral tokens and amounts for the operator across all strategies
+        for (uint256 i = 0; i < strategies.length(); i++) {
+            collateralTokens[i] = address(strategies[i].underlyingToken());
+            amounts[i] = strategy.sharesToUnderlyingView(shares);
+        }
+
+        return (collateralTokens, amounts);
+    }
+
     /// @notice Slash an operator in the AVS
     /// @param params The parameters for slashing the operator
     function slashOperator(
@@ -89,6 +115,16 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
         // if the call proceeds to the AllocationManager,
         // the operator will be slashed immediately and irreversibly.
         ALLOCATION_MANAGER.slashOperator(address(this), params);
+    }
+
+    /// @notice Get the list of whitelisted strategies for this AVS
+    /// @return The list of whitelisted strategies
+    function getWhitelistedStrategies() public view returns (address[] memory) {
+        address[] memory strategies = new address[](whitelistedStrategies.length());
+        for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
+            strategies[i] = whitelistedStrategies.at(i);
+        }
+        return strategies;
     }
 
     // ========= AVS Registrar functions ========= //
@@ -178,18 +214,6 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
         string calldata metadataURI
     ) public onlyOwner {
         ALLOCATION_MANAGER.updateAVSMetadataURI(address(this), metadataURI);
-    }
-
-    // ========= Getter functions ========= //
-
-    /// @notice Get the list of whitelisted strategies for this AVS
-    /// @return The list of whitelisted strategies
-    function getWhitelistedStrategies() public view returns (address[] memory) {
-        address[] memory strategies = new address[](whitelistedStrategies.length());
-        for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
-            strategies[i] = whitelistedStrategies.at(i);
-        }
-        return strategies;
     }
 
     // ========== Internal helpers ========== //
