@@ -11,7 +11,9 @@ import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 import {IVault} from "@symbiotic/core/interfaces/vault/IVault.sol";
 import {IEntity} from "@symbiotic/core/interfaces/common/IEntity.sol";
 import {IOperatorSpecificDelegator} from "@symbiotic/core/interfaces/delegator/IOperatorSpecificDelegator.sol";
+import {IBaseDelegator} from "@symbiotic/core/interfaces/delegator/IBaseDelegator.sol";
 import {IRegistry} from "@symbiotic/core/interfaces/common/IRegistry.sol";
+import {IOptInService} from "@symbiotic/core/interfaces/service/IOptInService.sol";
 import {Subnetwork} from "@symbiotic/core/contracts/libraries/Subnetwork.sol";
 import {INetworkRegistry} from "@symbiotic/core/interfaces/INetworkRegistry.sol";
 import {INetworkMiddlewareService} from "@symbiotic/core/interfaces/service/INetworkMiddlewareService.sol";
@@ -45,6 +47,9 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     // Most of these constants replicate view methods in the BaseMiddlewareReader.
     // See <https://docs.symbiotic.fi/middleware-sdk/api-reference/middleware/BaseMiddlewareReader> for more information.
 
+    /// @notice The timestamp of the first epoch (when this contract gets initialized).
+    uint48 public START_TIMESTAMP;
+
     /// @notice The address of the bolt registry
     address public BOLT_REGISTRY;
 
@@ -54,7 +59,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice The duration of the slashing window.
     uint48 public SLASHING_WINDOW;
 
-    /// @notice The duration of ena epoch.
+    /// @notice The duration of an epoch.
     uint48 public EPOCH_DURATION;
 
     /// @notice The Symbiotic vault registry.
@@ -72,7 +77,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     /**
      * @notice The set of whitelisted vaults for the network.
      */
-    PauseableEnumerableSet.AddressSet private _vaults;
+    PauseableEnumerableSet.AddressSet private _vaultWhitelist;
 
     /**
      * @notice The set of vaults for each operator.
@@ -83,6 +88,8 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
      * @notice Vaults to operators mapping.
      */
     EnumerableMap.AddressToAddressMap _vaultOperator;
+
+    PauseableEnumerableSet.AddressSet private _operators;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -102,10 +109,14 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /// =================== ERRORS ====================== //
+    error NotOperator();
+    error OperatorNotOptedIn();
+    error OperatorNotRegistered();
+
     error NotVault();
     error VaultNotInitialized();
     error VaultAlreadyRegistered();
-    error VaultNotRegistered();
+    error UnauthorizedVault();
     error NotOperatorSpecificVault();
 
     /// =================== MODIFIERS =================== //
@@ -157,6 +168,11 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         address newImplementation
     ) internal override onlyOwner {}
 
+    /**
+     * @notice Initialize the network with the network middleware service.
+     * @param networkMiddlewareService The address of the network middleware service.
+     * @dev IMPORTANT: This MUST only be called once, in the first initializer.
+     */
     function _initializeNetwork(
         address networkMiddlewareService
     ) public onlyOwner {
@@ -168,6 +184,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         INetworkMiddlewareService(networkMiddlewareService).setMiddleware(address(this));
 
         NETWORK = address(this);
+        START_TIMESTAMP = _now();
     }
 
     // TODO:
@@ -194,7 +211,38 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
      * @param vault The address of the vault
      */
     function registerOperator(address operator, address vault) public onlyBolt {
+        if (!IRegistry(OPERATOR_REGISTRY).isEntity(operator)) {
+            revert NotOperator();
+        }
+
+        if (!IOptInService(OPERATOR_NET_OPTIN).isOptedIn(operator, NETWORK)) {
+            revert OperatorNotOptedIn();
+        }
+
+        _operators.register(_now(), operator);
         _validateOperatorVault(operator, vault);
+    }
+
+    /**
+     * @notice Register an operator -> vault association.
+     * @param operator The address of the operator
+     * @param vault The address of the vault
+     */
+    function registerOperatorVault(address operator, address vault) public onlyBolt {
+        if (!_operators.contains(operator)) {
+            revert OperatorNotRegistered();
+        }
+
+        // Only allow registration of whitelisted vaults
+        if (!_vaultWhitelist.contains(vault)) {
+            revert UnauthorizedVault();
+        }
+
+        // Validate vault type
+        _validateOperatorVault(operator, vault);
+
+        _operatorVaults[operator].register(_now(), vault);
+        _vaultOperator.set(vault, operator);
     }
 
     /**
@@ -203,36 +251,86 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
      */
     function deregisterOperator(
         address operator
-    ) public onlyBolt {}
+    ) public onlyBolt {
+        _operators.unregister(_now(), SLASHING_WINDOW, operator);
+
+        // QUESTION: in the future we may not want to remove the vaults immediately, in case
+        // of a pending penalty that the operator is trying to avoid.
+        PauseableEnumerableSet.AddressSet storage vaults = _operatorVaults[operator];
+        delete _operatorVaults[operator];
+
+        for (uint256 i = 0; i < vaults.length(); i++) {
+            (address vault,,) = vaults.at(i);
+            _vaultOperator.remove(vault);
+        }
+    }
+
+    /**
+     * @notice Deregister an operator vault from the registry
+     * @param operator The address of the operator
+     * @param vault The address of the vault
+     */
+    function deregisterOperatorVault(address operator, address vault) public onlyBolt {
+        _operatorVaults[operator].unregister(_now(), SLASHING_WINDOW, vault);
+        _vaultOperator.remove(vault);
+    }
+
+    /**
+     * @notice Pause an operator
+     * @param operator The address of the operator
+     */
+    function pauseOperator(
+        address operator
+    ) public onlyOwner {
+        _operators.pause(_now(), operator);
+    }
+
+    /**
+     * @notice Unpause an operator
+     * @param operator The address of the operator
+     */
+    function unpauseOperator(
+        address operator
+    ) public onlyOwner {
+        _operators.unpause(_now(), SLASHING_WINDOW, operator);
+    }
+
+    /**
+     * @notice Returns the total number of registered operators
+     */
+    function operatorsLength() public view returns (uint256) {
+        return _operators.length();
+    }
 
     // ================ VAULTS ===================== //
 
     /**
-     * @notice Register a vault in the registry
+     * @notice Whitelists a vault for the network.
      * @param vault The address of the vault
      */
-    function registerVault(
-        address vault
-    ) public onlyOwner {
+    function whitelistVault(address vault, uint256 networkLimit) public onlyOwner {
         // Validate the vault
         _validateVault(vault);
 
         // Registers and enables the vault
-        _vaults.register(_now(), vault);
+        _vaultWhitelist.register(_now(), vault);
+
+        // Set the max network limit for the vault
+        IBaseDelegator(IVault(vault).delegator()).setMaxNetworkLimit(DEFAULT_SUBNETWORK, networkLimit);
     }
 
     /**
-     * @notice Deregister a vault from the registry
+     * @notice Removes a whitelisted vault from the network.
      * @param vault The address of the vault
      */
-    function deregisterVault(
+    function removeVault(
         address vault
     ) public onlyOwner {
-        if (!_vaults.contains(vault)) {
-            revert VaultNotRegistered();
-        }
+        _vaultWhitelist.unregister(_now(), SLASHING_WINDOW, vault);
+        _vaultOperator.remove(vault);
 
-        _vaults.unregister(_now(), SLASHING_WINDOW, vault);
+        // Set the max network limit for the vault to 0
+        IBaseDelegator(IVault(vault).delegator()).setMaxNetworkLimit(DEFAULT_SUBNETWORK, 0);
     }
 
     /**
@@ -242,7 +340,11 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     function pauseVault(
         address vault
     ) public onlyOwner {
-        _vaults.pause(_now(), vault);
+        _vaultWhitelist.pause(_now(), vault);
+        address operator = _vaultOperator.get(vault);
+        if (operator != address(0)) {
+            _operatorVaults[operator].pause(_now(), vault);
+        }
     }
 
     /**
@@ -252,7 +354,18 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     function unpauseVault(
         address vault
     ) public onlyOwner {
-        _vaults.unpause(_now(), SLASHING_WINDOW, vault);
+        _vaultWhitelist.unpause(_now(), SLASHING_WINDOW, vault);
+        address operator = _vaultOperator.get(vault);
+        if (operator != address(0)) {
+            _operatorVaults[operator].unpause(_now(), SLASHING_WINDOW, vault);
+        }
+    }
+
+    /**
+     * @notice Returns the total number of whitelisted vaults.
+     */
+    function vaultWhitelistLength() public view returns (uint256) {
+        return _vaultWhitelist.length();
     }
 
     /**
@@ -271,7 +384,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
             revert VaultNotInitialized();
         }
 
-        if (_vaults.contains(vault)) {
+        if (_vaultWhitelist.contains(vault)) {
             revert VaultAlreadyRegistered();
         }
 
@@ -293,6 +406,11 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         // }
     }
 
+    /**
+     * @notice Validates if a vault has an operator-specific delegator type
+     * @param operator The operator address
+     * @param vault The vault address
+     */
     function _validateOperatorVault(address operator, address vault) internal view {
         address delegator = IVault(vault).delegator();
         uint64 delegatorType = IEntity(delegator).TYPE();
