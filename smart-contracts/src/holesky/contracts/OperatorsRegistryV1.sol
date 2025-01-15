@@ -50,15 +50,15 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator
     /// @param restakingMiddleware The address of the restaking middleware
-    function registerOperator(address signer, string memory rpcEndpoint, address restakingMiddleware) public {
+    function registerOperator(address signer, string memory rpcEndpoint, string restakingProtocol) public {
         bytes32 key = bytes32(uint256(uint160(signer)));
         require(!OPERATORS._keys.contains(key), "Operator already exists");
 
         require(signer != address(0), "Invalid operator address");
         require(bytes(rpcEndpoint).length > 0, "Invalid rpc endpoint");
-        require(RESTAKING_MIDDLEWARES.contains(restakingMiddleware), "Invalid restaking middleware");
 
         // Validate the operator by calling the middleware
+        // IBoltRestakingMiddleware(restakingMiddleware).validateOperator(signer);
 
         OPERATORS._keys.add(key);
         OPERATORS._values[key] = Operator(signer, rpcEndpoint, restakingMiddleware);

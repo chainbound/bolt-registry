@@ -13,7 +13,12 @@ import {IStrategyManager} from "@eigenlayer/src/contracts/interfaces/IStrategyMa
 import {IAVSRegistrar} from "@eigenlayer/src/contracts/interfaces/IAVSRegistrar.sol";
 import {IStrategy} from "@eigenlayer/src/contracts/interfaces/IStrategy.sol";
 
-/// @title BoltEigenLayerMiddlewareV1
+/**
+ * @title BoltEigenLayerMiddlewareV1
+ * @author Chainbound Developers <dev@chainbound.io>
+ * @notice This contract is responsible for interacting with the EigenLayer restaking protocol contracts. It serves
+ *         as AVS contract and implements the IAVSRegistrar interface as well.
+ */
 contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegistrar {
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -136,11 +141,11 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
     /// @param operatorSetIds The operator set IDs the operator is registering for
     /// @param data Arbitrary data the operator can provide as part of registration
     function registerOperator(address operator, uint32[] calldata operatorSetIds, bytes calldata data) external {
-        // TODO: logic to decide if the operator can register to this AVS or not.
-        // NOTE: this function is called by AllocationManager.registerForOperatorSets,
-        // called by operators.
+        // NOTE: this function is called by AllocationManager.registerForOperatorSets(),
+        // called by operators when registering to this AVS. If this call reverts, 
+        // the registration will be unsuccessful.
 
-        // If this call reverts the registration will be unsuccessful.
+        // TODO: what do we need to validate here? 
     }
 
     /// @notice Allows the AllocationManager to hook into the middleware to validate operator deregistration
