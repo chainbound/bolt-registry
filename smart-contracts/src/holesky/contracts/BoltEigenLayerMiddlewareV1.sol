@@ -40,7 +40,7 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
      *
      * Total storage slots: 50
      */
-    uint256[45] private __gap;
+    uint256[44] private __gap;
 
     // ========= Events ========= //
 
@@ -96,12 +96,12 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
         }
 
         // get the shares of the operator across all strategies
-        uint256 shares = DELEGATION_MANAGER.getOperatorShares(operator, strategies);
+        uint256[] memory shares = DELEGATION_MANAGER.getOperatorShares(operator, strategies);
 
         // get the collateral tokens and amounts for the operator across all strategies
-        for (uint256 i = 0; i < strategies.length(); i++) {
+        for (uint256 i = 0; i < strategies.length; i++) {
             collateralTokens[i] = address(strategies[i].underlyingToken());
-            amounts[i] = strategies[i].sharesToUnderlyingView(shares);
+            amounts[i] = strategies[i].sharesToUnderlyingView(shares[i]);
         }
 
         return (collateralTokens, amounts);

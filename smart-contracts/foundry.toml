@@ -19,7 +19,13 @@ remappings = [
 
     # OpenZeppelin remappings contexts
     "lib/openzeppelin-contracts/:@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "lib/openzeppelin-contracts-upgradeable/:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/"
+    "lib/openzeppelin-contracts-upgradeable/:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
+
+    # EigenLayer remapping contexts
+    "lib/eigenlayer-contracts/:@openzeppelin-upgrades/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0/",
+    "lib/eigenlayer-contracts/:@openzeppelin/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/",
+    "lib/eigenlayer-contracts/:ds-test/=lib/eigenlayer-contracts/lib/ds-test/src/",
+    "lib/eigenlayer-contracts/:forge-std/=lib/eigenlayer-contracts/lib/forge-std/src/"
 ]
 
 [rpc_endpoints]
