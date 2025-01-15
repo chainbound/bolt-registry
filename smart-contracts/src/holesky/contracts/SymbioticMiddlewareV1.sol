@@ -93,7 +93,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
      *
      * Total storage slots: 50
      */
-    uint256[49] private __gap;
+    uint256[35] private __gap;
 
     /// @notice The vault delegator types.
     /// @dev <https://docs.symbiotic.fi/modules/vault/introduction#3-limits-and-delegation-logic-module>
