@@ -31,7 +31,7 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
     /// @notice Address of the EigenLayer Strategy Manager contract.
     IStrategyManager public STRATEGY_MANAGER;
 
-    /// @notice The name hash of the middleware
+    /// @notice The name of the middleware
     bytes32 public NAME_HASH;
 
     /// @notice The list of whitelisted strategies for this AVS

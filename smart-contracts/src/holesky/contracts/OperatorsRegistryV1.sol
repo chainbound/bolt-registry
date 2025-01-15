@@ -48,7 +48,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @notice Register an operator in the registry
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator
-    /// @param restakingProtocol The name of the restaking protocol used
+    /// @param restakingProtocol The identifier of the restaking protocol used to register
     function registerOperator(address signer, string memory rpcEndpoint, RestakingProtocol restakingProtocol) public {
         require(!OPERATORS._keys.contains(signer), "Operator already exists");
 
