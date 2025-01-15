@@ -25,13 +25,9 @@ import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/Pausea
  * @author Chainbound Developers <dev@chainbound.io>
  * @notice This contract is responsible for interacting with the Symbiotic restaking protocol contracts. It is both
  *         the middleware and the actual network contract, because it self-registers with the network registry.
- * @dev This contract implements the following middleware-sdk extensions:
- *      - Operators: Provides operator management (keys, vaults, registration)
- *      - KeyManagerAddress: Manages storage and validation of operator keys using address values
- *      - ECDSASig: Verify ECDSA keys against operator addresses
- *      - EqualStakePower: Equal stake to power for all registered vaults
- *      - TimestampCapture: Capture and store block timestamps
- *      - OwnableAccessManager: Provides onlyOwner access control
+ *         Responsibilities include: operator and vault management, stake aggregation across multiple vaults, and in the
+ *         future: slashing & rewards.
+ * @dev This contract is based on the middleware-SDK.
  *
  * For more information on extensions, see <https://docs.symbiotic.fi/middleware-sdk/extensions>.
  * All public view functions are implemented in the `BaseMiddlewareReader`: <https://docs.symbiotic.fi/middleware-sdk/api-reference/middleware/BaseMiddlewareReader>
@@ -74,21 +70,19 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Default subnetwork.
     uint96 internal constant DEFAULT_SUBNETWORK = 0;
 
-    /**
-     * @notice The set of whitelisted vaults for the network.
-     */
+    /// @notice The set of whitelisted vaults for the network.
     PauseableEnumerableSet.AddressSet private _vaultWhitelist;
 
-    /**
-     * @notice The set of vaults for each operator.
-     */
-    mapping(address => PauseableEnumerableSet.AddressSet) _operatorVaults;
+    /// @notice The set of operator-specific vaults for each operator.
+    mapping(address => PauseableEnumerableSet.AddressSet) private _operatorVaults;
 
-    /**
-     * @notice Vaults to operators mapping.
-     */
-    EnumerableMap.AddressToAddressMap _vaultOperator;
+    /// @notice The set of shared vaults.
+    PauseableEnumerableSet.AddressSet private _sharedVaults;
 
+    /// @notice Vaults to operators mapping.
+    EnumerableMap.AddressToAddressMap private _vaultOperator;
+
+    /// @notice The set of registered operators.
     PauseableEnumerableSet.AddressSet private _operators;
 
     /**
@@ -101,9 +95,13 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
      */
     uint256[49] private __gap;
 
+    /// @notice The vault delegator types.
+    /// @dev <https://docs.symbiotic.fi/modules/vault/introduction#3-limits-and-delegation-logic-module>
     enum DelegatorType {
+        // Shared vaults
         FULL_RESTAKE,
         NETWORK_RESTAKE,
+        // Operator-specific vaults
         OPERATOR_SPECIFIC,
         OPERATOR_NETWORK_SPECIFIC
     }
@@ -254,7 +252,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     ) public onlyBolt {
         _operators.unregister(_now(), SLASHING_WINDOW, operator);
 
-        // QUESTION: in the future we may not want to remove the vaults immediately, in case
+        // TODO(V3): in the future we may not want to remove the vaults immediately, in case
         // of a pending penalty that the operator is trying to avoid.
         PauseableEnumerableSet.AddressSet storage vaults = _operatorVaults[operator];
         delete _operatorVaults[operator];
@@ -296,6 +294,39 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /**
+     * @notice Gets the operator stake for the vault.
+     * @param operator The address of the operator.
+     * @param vault The address of the vault.
+     * @return The operator stake.
+     */
+    function getOperatorStake(address operator, address vault) public view returns (uint256) {
+        // TODO(V2): only do this for active operators & vaults?
+        return getOperatorStakeAt(operator, vault, _now());
+    }
+
+    /**
+     * @notice Gets the operator stake for the vault at a specific timestamp.
+     * @param operator The address of the operator.
+     * @param vault The address of the vault.
+     * @param timestamp The timestamp to get the stake at.
+     * @return The operator stake.
+     */
+    function getOperatorStakeAt(address operator, address vault, uint48 timestamp) public view returns (uint256) {
+        // TODO(V2): check if vault and operator are registered, associated & active
+        // Distinguish between shared vaults and operator vaults
+        // if (!_vaultWhitelist.contains(vault)) {
+        // revert UnauthorizedVault();
+        // }
+
+        // if (!_operatorVaults[operator].contains(vault)) {
+        // revert;
+        // }
+
+        bytes32 networkId = NETWORK.subnetwork(DEFAULT_SUBNETWORK);
+        return IBaseDelegator(IVault(vault).delegator()).stakeAt(networkId, operator, timestamp, "");
+    }
+
+    /**
      * @notice Returns the total number of registered operators
      */
     function operatorsLength() public view returns (uint256) {
@@ -327,6 +358,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         address vault
     ) public onlyOwner {
         _vaultWhitelist.unregister(_now(), SLASHING_WINDOW, vault);
+        _sharedVaults.unregister(_now(), SLASHING_WINDOW, vault);
         _vaultOperator.remove(vault);
 
         // Set the max network limit for the vault to 0
@@ -334,7 +366,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Pause a vault
+     * @notice Pause a vault across the network (whitelist, operator-specific, and shared).
      * @param vault The address of the vault
      */
     function pauseVault(
@@ -344,6 +376,10 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         address operator = _vaultOperator.get(vault);
         if (operator != address(0)) {
             _operatorVaults[operator].pause(_now(), vault);
+        }
+
+        if (_sharedVaults.contains(vault)) {
+            _sharedVaults.pause(_now(), vault);
         }
     }
 
@@ -359,6 +395,31 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         if (operator != address(0)) {
             _operatorVaults[operator].unpause(_now(), SLASHING_WINDOW, vault);
         }
+    }
+
+    /**
+     * @notice Registers a shared vault for the network.
+     * @param vault The address of the vault.
+     */
+    function registerSharedVault(
+        address vault
+    ) public onlyOwner {
+        _validateVault(vault);
+        _sharedVaults.register(_now(), vault);
+        // Whitelist if not already whitelisted
+        if (!_vaultWhitelist.contains(vault)) {
+            _vaultWhitelist.register(_now(), vault);
+        }
+    }
+
+    /**
+     * @notice Deregisters a shared vault from the network.
+     * @param vault The address of the vault.
+     */
+    function deregisterSharedVault(
+        address vault
+    ) public onlyOwner {
+        _sharedVaults.unregister(_now(), SLASHING_WINDOW, vault);
     }
 
     /**
@@ -384,11 +445,11 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
             revert VaultNotInitialized();
         }
 
-        if (_vaultWhitelist.contains(vault)) {
+        if (_vaultOperator.contains(vault) || _sharedVaults.contains(vault)) {
             revert VaultAlreadyRegistered();
         }
 
-        // TODO: slasher checks:
+        // TODO(V3): slasher checks:
 
         // uint48 vaultEpoch = IVault(vault).epochDuration();
         // address slasher = IVault(vault).slasher();
@@ -407,7 +468,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Validates if a vault has an operator-specific delegator type
+     * @notice Validates if a vault has an operator-specific delegator type (OPERATOR_SPECIFIC or OPERATOR_NETWORK_SPECIFIC)
      * @param operator The operator address
      * @param vault The vault address
      */
