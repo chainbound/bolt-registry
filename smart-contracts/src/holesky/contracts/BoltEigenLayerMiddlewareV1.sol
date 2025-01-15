@@ -127,11 +127,7 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
     /// @notice Get the list of whitelisted strategies for this AVS
     /// @return The list of whitelisted strategies
     function getWhitelistedStrategies() public view returns (address[] memory) {
-        address[] memory strategies = new address[](whitelistedStrategies.length());
-        for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
-            strategies[i] = whitelistedStrategies.at(i);
-        }
-        return strategies;
+        return whitelistedStrategies.values();
     }
 
     // ========= AVS Registrar functions ========= //
@@ -142,10 +138,10 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
     /// @param data Arbitrary data the operator can provide as part of registration
     function registerOperator(address operator, uint32[] calldata operatorSetIds, bytes calldata data) external {
         // NOTE: this function is called by AllocationManager.registerForOperatorSets(),
-        // called by operators when registering to this AVS. If this call reverts, 
+        // called by operators when registering to this AVS. If this call reverts,
         // the registration will be unsuccessful.
 
-        // TODO: what do we need to validate here? 
+        // TODO: what do we need to validate here?
     }
 
     /// @notice Allows the AllocationManager to hook into the middleware to validate operator deregistration

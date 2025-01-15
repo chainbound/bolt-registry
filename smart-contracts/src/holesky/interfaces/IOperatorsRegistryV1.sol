@@ -6,6 +6,12 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 /// @title IOperatorsRegistryV1
 /// @notice An interface for the OperatorsRegistryV1 contract
 interface IOperatorsRegistryV1 {
+    /// @notice The restaking protocols
+    enum RestakingProtocol {
+        EigenLayer,
+        Symbiotic
+    }
+
     /// @notice Operator struct
     struct Operator {
         address signer;
@@ -15,8 +21,8 @@ interface IOperatorsRegistryV1 {
 
     /// @notice A map of operators with their signer address as the key
     struct OperatorMap {
-        EnumerableSet.Bytes32Set _keys;
-        mapping(bytes32 key => Operator) _values;
+        EnumerableSet.AddressSet _keys;
+        mapping(address key => Operator) _values;
     }
 
     /// @notice Emitted when a new operator is registered

@@ -9,14 +9,13 @@ import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
 /// @title OperatorsRegistryV1
 /// @notice A smart contract to store and manage Bolt operators
 contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsRegistryV1 {
-    using EnumerableSet for EnumerableSet.Bytes32Set;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice The set of bolt operators indexed by their signer address
     OperatorMap private OPERATORS;
 
-    /// @notice The set of restaking middleware contract addresses
-    EnumerableSet.AddressSet private RESTAKING_MIDDLEWARES;
+    /// @notice The mapping of restaking protocols to their middleware contract addresses
+    mapping(RestakingProtocol => address) private RESTAKING_MIDDLEWARES;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -26,7 +25,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
      *
      * Total storage slots: 50
      */
-    uint256[45] private __gap;
+    uint256[46] private __gap;
 
     // ========= Initializer & Proxy functionality ========= //
 
@@ -49,19 +48,21 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @notice Register an operator in the registry
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator
-    /// @param restakingMiddleware The address of the restaking middleware
-    function registerOperator(address signer, string memory rpcEndpoint, string restakingProtocol) public {
-        bytes32 key = bytes32(uint256(uint160(signer)));
-        require(!OPERATORS._keys.contains(key), "Operator already exists");
+    /// @param restakingProtocol The name of the restaking protocol used
+    function registerOperator(address signer, string memory rpcEndpoint, RestakingProtocol restakingProtocol) public {
+        require(!OPERATORS._keys.contains(signer), "Operator already exists");
 
         require(signer != address(0), "Invalid operator address");
         require(bytes(rpcEndpoint).length > 0, "Invalid rpc endpoint");
 
+        address restakingMiddleware = RESTAKING_MIDDLEWARES[restakingProtocol];
+        require(restakingMiddleware != address(0), "Invalid restaking protocol");
+
         // Validate the operator by calling the middleware
         // IBoltRestakingMiddleware(restakingMiddleware).validateOperator(signer);
 
-        OPERATORS._keys.add(key);
-        OPERATORS._values[key] = Operator(signer, rpcEndpoint, restakingMiddleware);
+        OPERATORS._keys.add(signer);
+        OPERATORS._values[signer] = Operator(signer, rpcEndpoint, restakingMiddleware);
         emit OperatorRegistered(signer, rpcEndpoint, restakingMiddleware);
     }
 
@@ -71,7 +72,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
         uint256 length = OPERATORS._keys.length();
         Operator[] memory _operators = new Operator[](length);
         for (uint256 i = 0; i < length; i++) {
-            bytes32 key = OPERATORS._keys.at(i);
+            address key = OPERATORS._keys.at(i);
             _operators[i] = OPERATORS._values[key];
         }
         return _operators;
@@ -83,8 +84,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     function getOperator(
         address signer
     ) public view returns (Operator memory operator) {
-        bytes32 key = bytes32(uint256(uint160(signer)));
-        return OPERATORS._values[key];
+        return OPERATORS._values[signer];
     }
 
     /// @notice Returns true if the given address is an operator in the registry
@@ -93,24 +93,25 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     function isOperator(
         address signer
     ) public view returns (bool) {
-        bytes32 key = bytes32(uint256(uint160(signer)));
-        return OPERATORS._keys.contains(key);
+        return OPERATORS._keys.contains(signer);
     }
 
     // ========= Restaking Middlewres ========= //
 
-    /// @notice Add a restaking middleware contract address to the registry
-    /// @param middleware The address of the restaking middleware
-    function addRestakingMiddleware(
-        address middleware
-    ) public onlyOwner {
+    /// @notice Update the address of a restaking middleware contract address
+    /// @param restakingProtocol The identifier of the restaking protocol
+    /// @param middleware The address of the new restaking middleware
+    function updateRestakingMiddleware(RestakingProtocol restakingProtocol, address middleware) public onlyOwner {
         require(middleware != address(0), "Invalid middleware address");
-        RESTAKING_MIDDLEWARES.add(middleware);
+        RESTAKING_MIDDLEWARES[restakingProtocol] = middleware;
     }
 
-    /// @notice Returns the addresses of the middleware contracts of restaking middlewares supported by Bolt.
-    /// @return middlewares The array of middleware addresses
-    function getSupportedRestakingMiddlewares() public view returns (address[] memory middlewares) {
-        return RESTAKING_MIDDLEWARES.values();
+    /// @notice Returns the address of the restaking middleware for the given restaking protocol
+    /// @param restakingProtocol The identifier of the restaking protocol
+    /// @return middleware The address of the restaking middleware
+    function getRestakingMiddleware(
+        RestakingProtocol restakingProtocol
+    ) public view returns (address middleware) {
+        return RESTAKING_MIDDLEWARES[restakingProtocol];
     }
 }
