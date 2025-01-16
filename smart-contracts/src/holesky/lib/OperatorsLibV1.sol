@@ -60,15 +60,26 @@ library OperatorsLibV1 {
     /// @notice Get the number of operators in the map
     /// @param self The OperatorMap
     /// @return The number of operators
-    function length(OperatorMap storage self) internal view returns (uint256) {
+    function length(
+        OperatorMap storage self
+    ) internal view returns (uint256) {
         return self._keys.length();
     }
 
     /// @notice Get all the operators in the map
     /// @param self The OperatorMap
     /// @return The array of operators
-    function getAll(OperatorMap storage self) internal view returns (Operator[] memory) {
-        return self.values();
+    function getAll(
+        OperatorMap storage self
+    ) internal view returns (Operator[] memory) {
+        Operator[] memory operators = new Operator[](self._keys.length());
+
+        for (uint256 i = 0; i < self._keys.length(); i++) {
+            address key = self._keys.at(i);
+            operators[i] = self._values[key];
+        }
+
+        return operators;
     }
 
     /// @notice Get an operator from the map

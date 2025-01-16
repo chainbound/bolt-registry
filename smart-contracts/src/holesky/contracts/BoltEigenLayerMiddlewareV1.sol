@@ -13,13 +13,21 @@ import {IStrategyManager} from "@eigenlayer/src/contracts/interfaces/IStrategyMa
 import {IAVSRegistrar} from "@eigenlayer/src/contracts/interfaces/IAVSRegistrar.sol";
 import {IStrategy} from "@eigenlayer/src/contracts/interfaces/IStrategy.sol";
 
+import {IBoltRestakingMiddlewareV1} from "../interfaces/IBoltRestakingMiddlewareV1.sol";
+import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
+
 /**
  * @title BoltEigenLayerMiddlewareV1
  * @author Chainbound Developers <dev@chainbound.io>
  * @notice This contract is responsible for interacting with the EigenLayer restaking protocol contracts. It serves
  *         as AVS contract and implements the IAVSRegistrar interface as well.
  */
-contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegistrar {
+contract BoltEigenLayerMiddlewareV1 is
+    OwnableUpgradeable,
+    UUPSUpgradeable,
+    IAVSRegistrar,
+    IBoltRestakingMiddlewareV1
+{
     using EnumerableSet for EnumerableSet.AddressSet;
 
     /// @notice Address of the EigenLayer Allocation Manager contract.
@@ -30,6 +38,9 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
 
     /// @notice Address of the EigenLayer Strategy Manager contract.
     IStrategyManager public STRATEGY_MANAGER;
+
+    /// @notice Address of the Bolt Operators Registry contract.
+    IOperatorsRegistryV1 public OPERATORS_REGISTRY;
 
     /// @notice The name of the middleware
     bytes32 public NAME_HASH;
@@ -62,17 +73,20 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
     /// @param _eigenlayerAllocationManager The address of the EigenLayer Allocation Manager contract
     /// @param _eigenlayerDelegationManager The address of the EigenLayer Delegation Manager contract
     /// @param _eigenlayerStrategyManager The address of the EigenLayer Strategy Manager contract
+    /// @param _operatorsRegistry The address of the Operators Registry contract
     function initialize(
         address owner,
         IAllocationManager _eigenlayerAllocationManager,
         IDelegationManager _eigenlayerDelegationManager,
-        IStrategyManager _eigenlayerStrategyManager
+        IStrategyManager _eigenlayerStrategyManager,
+        IOperatorsRegistryV1 _operatorsRegistry
     ) public initializer {
         __Ownable_init(owner);
 
         ALLOCATION_MANAGER = _eigenlayerAllocationManager;
         DELEGATION_MANAGER = _eigenlayerDelegationManager;
         STRATEGY_MANAGER = _eigenlayerStrategyManager;
+        OPERATORS_REGISTRY = _operatorsRegistry;
         NAME_HASH = keccak256("EIGENLAYER");
     }
 
@@ -112,16 +126,14 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
         return (collateralTokens, amounts);
     }
 
-    /// @notice Slash an operator in the AVS
-    /// @param params The parameters for slashing the operator
-    function slashOperator(
-        IAllocationManagerTypes.SlashingParams calldata params
-    ) public {
-        // TODO: Implement slashing logic
+    /// @notice Get the CURRENT amount staked by an operator for a specific collateral
+    /// @param operator The operator address to get the amount staked for
+    /// @param collateral The collateral token address
+    /// @return The amount staked by the operator for the collateral
+    function getOperatorStake(address operator, address collateral) public view returns (uint256) {
+        // TODO: impl
 
-        // if the call proceeds to the AllocationManager,
-        // the operator will be slashed immediately and irreversibly.
-        ALLOCATION_MANAGER.slashOperator(address(this), params);
+        return 0;
     }
 
     /// @notice Get the list of whitelisted strategies for this AVS
@@ -141,20 +153,20 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
         // called by operators when registering to this AVS. If this call reverts,
         // the registration will be unsuccessful.
 
-        // TODO: what do we need to validate here?
+        // We forward the call to the OperatorsRegistry to register the operator in its storage.
+        OPERATORS_REGISTRY.registerOperator(operator, string(data));
     }
 
     /// @notice Allows the AllocationManager to hook into the middleware to validate operator deregistration
     /// @param operator The address of the operator
     /// @param operatorSetIds The operator set IDs the operator is deregistering from
     function deregisterOperator(address operator, uint32[] calldata operatorSetIds) external {
-        // TODO: logic to decide if the operator can deregister from this AVS or not.
         // NOTE: this function is called by AllocationManager.deregisterFromOperatorSets,
-        // called by operators.
-
+        // called by operators when deregistering from this AVS.
         // Failure does nothing here: if this call reverts the deregistration will still go through.
-        // this is done for security reasons, to prevent AVSs from being able to maliciously
-        // prevent operators from deregistering.
+
+        // We forward the call to the OperatorsRegistry to deregister the operator from its storage.
+        OPERATORS_REGISTRY.deregisterOperator(operator);
     }
 
     // ========= Admin functions ========= //
@@ -189,7 +201,7 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
         IAllocationManagerTypes.CreateSetParams[] calldata params
     ) public onlyOwner {
         for (uint256 i = 0; i < params.length; i++) {
-            _checkAreStrategiesWhitelisted(params[i].strategies);
+            _checkAreAllStrategiesWhitelisted(params[i].strategies);
         }
 
         ALLOCATION_MANAGER.createOperatorSets(address(this), params);
@@ -199,7 +211,7 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
     /// @param operatorSetId The ID of the operator set to add strategies to
     /// @param strategies The strategies to add
     function addStrategiesToOperatorSet(uint32 operatorSetId, IStrategy[] calldata strategies) public onlyOwner {
-        _checkAreStrategiesWhitelisted(strategies);
+        _checkAreAllStrategiesWhitelisted(strategies);
 
         ALLOCATION_MANAGER.addStrategiesToOperatorSet(address(this), operatorSetId, strategies);
     }
@@ -224,7 +236,7 @@ contract BoltEigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVS
     /// @notice Check if ALL the given strategies are whitelisted.
     /// If any of the strategies are not whitelisted, the function will revert.
     /// @param strategies The strategies to check
-    function _checkAreStrategiesWhitelisted(
+    function _checkAreAllStrategiesWhitelisted(
         IStrategy[] calldata strategies
     ) internal view {
         for (uint256 i = 0; i < strategies.length; i++) {

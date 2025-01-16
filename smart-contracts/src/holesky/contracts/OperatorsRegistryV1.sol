@@ -5,7 +5,6 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
-import {IBoltResakingMiddlewareV1} from "../interfaces/IBoltResakingMiddlewareV1.sol";
 import {OperatorsLibV1} from "../lib/OperatorsLibV1.sol";
 
 /// @title OperatorsRegistryV1
@@ -73,9 +72,21 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
         emit OperatorRegistered(signer, rpcEndpoint, msg.sender);
     }
 
+    /// @notice Deregister an operator from the registry
+    /// @param signer The address of the operator
+    /// @dev Only restaking middleware contracts can call this function
+    function deregisterOperator(
+        address signer
+    ) external onlyMiddleware {
+        require(OPERATORS.contains(signer), "Operator does not exist");
+
+        OPERATORS.remove(signer);
+        emit OperatorDeregistered(signer, msg.sender);
+    }
+
     /// @notice Returns all the operators saved in the registry
     /// @return operators The array of operators
-    function getAllOperators() public view returns (Operator[] memory operators) {
+    function getAllOperators() public view returns (OperatorsLibV1.Operator[] memory operators) {
         return OPERATORS.getAll();
     }
 
@@ -85,7 +96,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @dev Reverts if the operator does not exist
     function getOperator(
         address signer
-    ) public view returns (Operator memory operator) {
+    ) public view returns (OperatorsLibV1.Operator memory operator) {
         return OPERATORS.get(signer);
     }
 
@@ -101,14 +112,16 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     // ========= Restaking Middlewres ========= //
 
     /// @notice Update the address of a restaking middleware contract address
-    /// @param restakingProtocol The identifier of the restaking protocol
-    /// @param middleware The address of the new restaking middleware
-    function updateRestakingMiddleware(string restakingProtocol, address newMiddleware) public onlyOwner {
+    /// @param restakingProtocol The name of the restaking protocol
+    /// @param newMiddleware The address of the new restaking middleware
+    function updateRestakingMiddleware(string calldata restakingProtocol, address newMiddleware) public onlyOwner {
         require(newMiddleware != address(0), "Invalid middleware address");
 
-        if (restakingProtocol == "EIGENLAYER") {
+        bytes32 protocolNameHash = keccak256(abi.encodePacked(restakingProtocol));
+
+        if (protocolNameHash == keccak256("EIGENLAYER")) {
             EIGENLAYER_RESTAKING_MIDDLEWARE = newMiddleware;
-        } else if (restakingProtocol == "SYMBIOTIC") {
+        } else if (protocolNameHash == keccak256("SYMBIOTIC")) {
             SYMBIOTIC_RESTAKING_MIDDLEWARE = newMiddleware;
         } else {
             revert("Invalid restaking protocol name. Valid values are: 'EIGENLAYER', 'SYMBIOTIC'");

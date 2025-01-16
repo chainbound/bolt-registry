@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-/// @title IBoltResakingMiddlewareV1
+/// @title IBoltRestakingMiddlewareV1
 /// @notice An interface for generalized restaking protocol middlewares in Bolt
-interface IBoltResakingMiddlewareV1 {
+interface IBoltRestakingMiddlewareV1 {
     function getOperatorCollaterals(
         address operator
     ) external view returns (address[] memory, uint256[] memory);

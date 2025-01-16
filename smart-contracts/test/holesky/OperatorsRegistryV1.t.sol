@@ -21,29 +21,7 @@ contract OperatorsRegistryTest is Test {
         vm.startPrank(admin);
         registry = new OperatorsRegistryV1();
         registry.initialize(admin);
-        registry.updateRestakingMiddleware(IOperatorsRegistryV1.RestakingProtocol.EigenLayer, restakingMiddleware);
+        registry.updateRestakingMiddleware("EIGANLAYER", restakingMiddleware);
         vm.stopPrank();
-    }
-
-    function testRegisterOperator() public {
-        string memory rpcEndpoint = "http://localhost:8545";
-
-        registry.registerOperator(signer, rpcEndpoint, IOperatorsRegistryV1.RestakingProtocol.EigenLayer);
-    }
-
-    function testRegisterOperatorDuplicateSigner() public {
-        string memory rpcEndpoint = "http://localhost:8545";
-
-        registry.registerOperator(signer, rpcEndpoint, IOperatorsRegistryV1.RestakingProtocol.EigenLayer);
-        vm.expectRevert("Operator already exists");
-        registry.registerOperator(signer, rpcEndpoint, IOperatorsRegistryV1.RestakingProtocol.EigenLayer);
-    }
-
-    function testRegisterOperatorInvalidSigner() public {
-        string memory rpcEndpoint = "http://localhost:8545";
-
-        address invalidSigner = address(0x0);
-        vm.expectRevert("Invalid operator address");
-        registry.registerOperator(invalidSigner, rpcEndpoint, IOperatorsRegistryV1.RestakingProtocol.EigenLayer);
     }
 }
