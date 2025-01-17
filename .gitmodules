@@ -11,3 +11,6 @@
 	path = smart-contracts/lib/eigenlayer-contracts
 	url = https://github.com/Layr-Labs/eigenlayer-contracts
 	branch = slashing-magnitudes
+[submodule "smart-contracts/lib/core"]
+	path = smart-contracts/lib/core
+	url = https://github.com/symbioticfi/core
