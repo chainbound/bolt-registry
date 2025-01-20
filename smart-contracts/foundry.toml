@@ -18,6 +18,9 @@ remappings = [
     "@eigenlayer/=lib/eigenlayer-contracts/",
     "@symbiotic/middleware-sdk/=lib/middleware-sdk/src/",
 
+    # Access the EigenLayer dependencies. Needed for tests.
+    "@openzeppelin/contracts-eigenlayer/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/contracts/",
+
     # OpenZeppelin remappings contexts
     "lib/openzeppelin-contracts/:@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "lib/openzeppelin-contracts-upgradeable/:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
