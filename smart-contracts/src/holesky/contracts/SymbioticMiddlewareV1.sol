@@ -9,6 +9,7 @@ import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 
 import {IVault} from "@symbiotic/core/interfaces/vault/IVault.sol";
+import {IVaultStorage} from "@symbiotic/core/interfaces/vault/IVaultStorage.sol";
 import {IEntity} from "@symbiotic/core/interfaces/common/IEntity.sol";
 import {IOperatorSpecificDelegator} from "@symbiotic/core/interfaces/delegator/IOperatorSpecificDelegator.sol";
 import {IBaseDelegator} from "@symbiotic/core/interfaces/delegator/IBaseDelegator.sol";
@@ -120,15 +121,6 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     /// =================== MODIFIERS =================== //
 
     /**
-     * @notice Modifier to restrict access to the bolt registry.
-     * @dev This modifier exists alongside `checkAccess`, which restricts access to the owner.
-     */
-    modifier onlyBolt() {
-        require(msg.sender == BOLT_REGISTRY, "SymbioticMiddlewareV1: Only the bolt registry can call this function");
-        _;
-    }
-
-    /**
      * @notice Constructor for initializing the SymbioticMiddlewareV1 contract
      * @param owner The address of the owner
      * @param networkMiddlewareService The address of the network middleware service
@@ -205,20 +197,17 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
 
     /**
      * @notice Register an operator in the registry
-     * @param operator The address of the operator
-     * @param vault The address of the vault
      */
-    function registerOperator(address operator, address vault) public onlyBolt {
-        if (!IRegistry(OPERATOR_REGISTRY).isEntity(operator)) {
+    function registerOperator() public {
+        if (!IRegistry(OPERATOR_REGISTRY).isEntity(msg.sender)) {
             revert NotOperator();
         }
 
-        if (!IOptInService(OPERATOR_NET_OPTIN).isOptedIn(operator, NETWORK)) {
+        if (!IOptInService(OPERATOR_NET_OPTIN).isOptedIn(msg.sender, NETWORK)) {
             revert OperatorNotOptedIn();
         }
 
-        _operators.register(_now(), operator);
-        _validateOperatorVault(operator, vault);
+        _operators.register(_now(), msg.sender);
     }
 
     /**
@@ -226,7 +215,7 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
      * @param operator The address of the operator
      * @param vault The address of the vault
      */
-    function registerOperatorVault(address operator, address vault) public onlyBolt {
+    function registerOperatorVault(address operator, address vault) public {
         if (!_operators.contains(operator)) {
             revert OperatorNotRegistered();
         }
@@ -245,17 +234,14 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
 
     /**
      * @notice Deregister an operator from the registry
-     * @param operator The address of the operator
      */
-    function deregisterOperator(
-        address operator
-    ) public onlyBolt {
-        _operators.unregister(_now(), SLASHING_WINDOW, operator);
+    function deregisterOperator() public {
+        _operators.unregister(_now(), SLASHING_WINDOW, msg.sender);
 
         // TODO(V3): in the future we may not want to remove the vaults immediately, in case
         // of a pending penalty that the operator is trying to avoid.
-        PauseableEnumerableSet.AddressSet storage vaults = _operatorVaults[operator];
-        delete _operatorVaults[operator];
+        PauseableEnumerableSet.AddressSet storage vaults = _operatorVaults[msg.sender];
+        delete _operatorVaults[msg.sender];
 
         for (uint256 i = 0; i < vaults.length(); i++) {
             (address vault,,) = vaults.at(i);
@@ -265,11 +251,12 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
 
     /**
      * @notice Deregister an operator vault from the registry
-     * @param operator The address of the operator
      * @param vault The address of the vault
      */
-    function deregisterOperatorVault(address operator, address vault) public onlyBolt {
-        _operatorVaults[operator].unregister(_now(), SLASHING_WINDOW, vault);
+    function deregisterOperatorVault(
+        address vault
+    ) public {
+        _operatorVaults[msg.sender].unregister(_now(), SLASHING_WINDOW, vault);
         _vaultOperator.remove(vault);
     }
 
@@ -292,6 +279,8 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     ) public onlyOwner {
         _operators.unpause(_now(), SLASHING_WINDOW, operator);
     }
+
+    // ================ OPERATOR VIEW METHODS =================== //
 
     /**
      * @notice Gets the operator stake for the vault.
@@ -324,6 +313,24 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
 
         bytes32 networkId = NETWORK.subnetwork(DEFAULT_SUBNETWORK);
         return IBaseDelegator(IVault(vault).delegator()).stakeAt(networkId, operator, timestamp, "");
+    }
+
+    function getOperatorCollaterals(
+        address operator
+    ) public view returns (address[] memory, uint256[] memory) {
+        address[] memory tokens = new address[](_vaultWhitelist.length());
+        uint256[] memory amounts = new uint256[](_vaultWhitelist.length());
+
+        bytes32 networkId = NETWORK.subnetwork(DEFAULT_SUBNETWORK);
+
+        for (uint256 i = 0; i < _vaultWhitelist.length(); i++) {
+            // TODO(V2): only get active vaults
+            (address vault,,) = _vaultWhitelist.at(i);
+            tokens[i] = IVaultStorage(vault).collateral();
+            amounts[i] = IBaseDelegator(IVault(vault).delegator()).stake(networkId, operator);
+        }
+
+        return (tokens, amounts);
     }
 
     /**
@@ -400,16 +407,17 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     /**
      * @notice Registers a shared vault for the network.
      * @param vault The address of the vault.
+     * @param networkLimit The network limit for the vault.
+     * @dev If the vault is not already whitelisted, it will be whitelisted, and the network
+     * limit will be set. The vault will then be registered as a shared vault.
      */
-    function registerSharedVault(
-        address vault
-    ) public onlyOwner {
-        _validateVault(vault);
-        _sharedVaults.register(_now(), vault);
+    function registerSharedVault(address vault, uint256 networkLimit) public onlyOwner {
         // Whitelist if not already whitelisted
         if (!_vaultWhitelist.contains(vault)) {
-            _vaultWhitelist.register(_now(), vault);
+            this.whitelistVault(vault, networkLimit);
         }
+
+        _sharedVaults.register(_now(), vault);
     }
 
     /**
