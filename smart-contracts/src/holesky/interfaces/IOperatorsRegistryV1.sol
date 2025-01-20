@@ -15,6 +15,16 @@ interface IOperatorsRegistryV1 {
     /// @param restakingMiddleware The address of the restaking middleware
     event OperatorDeregistered(address signer, address restakingMiddleware);
 
+    /// @notice Emitted when an operator is paused
+    /// @param signer The address of the operator
+    /// @param restakingMiddleware The address of the restaking middleware
+    event OperatorPaused(address signer, address restakingMiddleware);
+
+    /// @notice Emitted when an operator is unpaused
+    /// @param signer The address of the operator
+    /// @param restakingMiddleware The address of the restaking middleware
+    event OperatorUnpaused(address signer, address restakingMiddleware);
+
     /// @notice Register an operator in the registry
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator

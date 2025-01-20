@@ -60,21 +60,58 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     }
 
     // ========= Operators functions ========= //
+    //
+    // The operator lifecycle looks as follows:
+    // 1. Register, and become active immediately. The operator can then manage their
+    //    restaking positions through the EL AllocationManager contract.
+    // 2. Pause, and become inactive (with a delay). The operator won't be slashable anymore,
+    //    but they can still manage and rebalance their positions.
+    // 3. Unpause, and become active again (with a delay). The operator can be slashed again.
+    // 4. Deregister, and become inactive (with a delay). The operator won't be part of the AVS anymore.
 
     /// @notice Register an operator in the registry
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator
     /// @dev Only restaking middleware contracts can call this function
     function registerOperator(address signer, string memory rpcEndpoint) external onlyMiddleware {
-        require(!OPERATORS.contains(signer), "Operator already exists");
-
         OPERATORS.add(signer, rpcEndpoint, msg.sender);
         emit OperatorRegistered(signer, rpcEndpoint, msg.sender);
+    }
+
+    /// @notice Pause an operator in the registry
+    /// @param signer The address of the operator
+    /// @dev Only restaking middleware contracts can call this function.
+    /// @dev Paused operators are considered "inactive" until they are unpaused.
+    function pauseOperator(
+        address signer
+    ) external onlyMiddleware {
+        OPERATORS.pause(signer);
+        emit OperatorPaused(signer, msg.sender);
+    }
+
+    /// @notice Unpause an operator in the registry, marking them as "active"
+    /// @param signer The address of the operator
+    /// @dev Only restaking middleware contracts can call this function
+    /// @dev Operators need to be paused and wait for IMMUTABLE_PERIOD() before they can be deregistered.
+    function unpauseOperator(
+        address signer
+    ) external onlyMiddleware {
+        OPERATORS.unpause(signer);
+        emit OperatorUnpaused(signer, msg.sender);
+    }
+
+    /// @notice Update the rpc endpoint of an operator
+    /// @param signer The address of the operator
+    /// @param newRpcEndpoint The new rpc endpoint
+    /// @dev Only restaking middleware contracts can call this function
+    function updateOperatorRpcEndpoint(address signer, string memory newRpcEndpoint) external onlyMiddleware {
+        OPERATORS.updateRpcEndpoint(signer, newRpcEndpoint);
     }
 
     /// @notice Deregister an operator from the registry
     /// @param signer The address of the operator
     /// @dev Only restaking middleware contracts can call this function
+    /// @dev Operators need to be paused and wait for IMMUTABLE_PERIOD() before they can be deregistered.
     function deregisterOperator(
         address signer
     ) external onlyMiddleware {
@@ -90,13 +127,13 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
         return OPERATORS.getAll();
     }
 
-    /// @notice Returns the operator with the given signer address
+    /// @notice Returns the operator with the given signer address, and whether the operator is active
     /// @param signer The address of the operator
-    /// @return operator The operator struct
+    /// @return operator The operator struct and a boolean indicating if the operator is active
     /// @dev Reverts if the operator does not exist
     function getOperator(
         address signer
-    ) public view returns (OperatorsLibV1.Operator memory operator) {
+    ) public view returns (OperatorsLibV1.Operator memory operator, bool isActive) {
         return OPERATORS.get(signer);
     }
 
