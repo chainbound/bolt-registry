@@ -97,6 +97,12 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         OPERATOR_NETWORK_SPECIFIC
     }
 
+    /// =================== EVENTS ====================== //
+    event VaultPaused(address indexed vault);
+    event VaultUnpaused(address indexed vault);
+    event VaultWhitelisted(address indexed vault);
+    event VaultRemoved(address indexed vault);
+
     /// =================== ERRORS ====================== //
     error NotOperator();
     error OperatorNotOptedIn();
@@ -236,10 +242,19 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         uint256[] memory amounts = new uint256[](_vaultWhitelist.length());
 
         bytes32 networkId = NETWORK.subnetwork(DEFAULT_SUBNETWORK);
+        // TODO:!!!!
+        uint48 epochStartTs = 0;
 
         for (uint256 i = 0; i < _vaultWhitelist.length(); i++) {
             // TODO(V2): only get active vaults
-            (address vault,,) = _vaultWhitelist.at(i);
+            (address vault, uint48 enabledTime, uint48 disabledTime) = _vaultWhitelist.at(i);
+
+            if (!_wasEnabledAt(enabledTime, disabledTime, epochStartTs)) {
+                // Set the token, keep the amount at 0
+                tokens[i] = IVaultStorage(vault).collateral();
+                continue;
+            }
+
             tokens[i] = IVaultStorage(vault).collateral();
             amounts[i] = IBaseDelegator(IVault(vault).delegator()).stake(networkId, operator);
         }
@@ -261,6 +276,8 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
 
         // Registers and enables the vault
         _vaultWhitelist.register(_now(), vault);
+
+        emit VaultWhitelisted(vault);
     }
 
     /**
@@ -271,6 +288,7 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         address vault
     ) public onlyOwner {
         _vaultWhitelist.unregister(_now(), SLASHING_WINDOW, vault);
+        emit VaultRemoved(vault);
     }
 
     /**
@@ -281,6 +299,7 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         address vault
     ) public onlyOwner {
         _vaultWhitelist.pause(_now(), vault);
+        emit VaultPaused(vault);
     }
 
     /**
@@ -291,6 +310,7 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         address vault
     ) public onlyOwner {
         _vaultWhitelist.unpause(_now(), SLASHING_WINDOW, vault);
+        emit VaultUnpaused(vault);
     }
 
     /**
@@ -356,12 +376,15 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         }
     }
 
-    /**
-     * @notice Returns the current timestamp minus 1 second.
-     * @return timestamp The current timestamp minus 1 second.
-     */
-    function getCaptureTimestamp() public view returns (uint48 timestamp) {
-        return _now() - 1;
+    // ========= HELPER FUNCTIONS =========
+
+    /// @notice Check if a map entry was active at a given timestamp.
+    /// @param enabledTime The enabled time of the map entry.
+    /// @param disabledTime The disabled time of the map entry.
+    /// @param timestamp The timestamp to check the map entry status at.
+    /// @return True if the map entry was active at the given timestamp, false otherwise.
+    function _wasEnabledAt(uint48 enabledTime, uint48 disabledTime, uint48 timestamp) private pure returns (bool) {
+        return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
     }
 
     /**
