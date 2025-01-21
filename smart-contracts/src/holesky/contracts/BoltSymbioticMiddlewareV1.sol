@@ -50,20 +50,11 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
     /// @notice The name hash of this middleware.
     bytes32 public NAME_HASH;
 
-    /// @notice The timestamp of the first epoch (when this contract gets initialized).
-    uint48 public START_TIMESTAMP;
-
     /// @notice The address of the bolt registry
     IOperatorsRegistryV1 public OPERATORS_REGISTRY;
 
     /// @notice The Symbiotic network: address(this)
     address public NETWORK;
-
-    /// @notice The duration of the slashing window.
-    uint48 public SLASHING_WINDOW;
-
-    /// @notice The duration of an epoch.
-    uint48 public EPOCH_DURATION;
 
     /// @notice The Symbiotic vault registry.
     address public VAULT_REGISTRY;
