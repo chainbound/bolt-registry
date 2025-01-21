@@ -210,7 +210,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
      */
     function getOperatorStake(address operator, address collateral) public view returns (uint256) {
         // TODO(V2): only do this for active operators & vaults?
-        return getOperatorStakeAt(operator, collateral, _now());
+        return getOperatorStakeAt(operator, collateral, OPERATORS_REGISTRY.getCurrentEpochStartTimestamp());
     }
 
     /**
@@ -227,7 +227,13 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         // Get vault for collateral
         address vault;
         for (uint256 i = 0; i < _vaultWhitelist.length(); i++) {
-            (address _vault,,) = _vaultWhitelist.at(i);
+            (address _vault, uint48 enabledTime, uint48 disabledTime) = _vaultWhitelist.at(i);
+
+            if (!_wasEnabledAt(enabledTime, disabledTime, timestamp)) {
+                // Set the token, keep the amount at 0
+                continue;
+            }
+
             if (IVaultStorage(_vault).collateral() == collateral) {
                 vault = _vault;
                 break;
@@ -249,8 +255,8 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         uint256[] memory amounts = new uint256[](_vaultWhitelist.length());
 
         bytes32 networkId = NETWORK.subnetwork(DEFAULT_SUBNETWORK);
-        // TODO:!!!!
-        uint48 epochStartTs = 0;
+
+        uint48 epochStartTs = OPERATORS_REGISTRY.getCurrentEpochStartTimestamp();
 
         for (uint256 i = 0; i < _vaultWhitelist.length(); i++) {
             // TODO(V2): only get active vaults

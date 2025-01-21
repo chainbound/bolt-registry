@@ -1,5 +1,5 @@
 [profile.default]
-solc = "0.8.25"
+solc = "0.8.27"
 via_ir = true
 src = "src"
 out = "out"
@@ -24,7 +24,7 @@ remappings = [
     "lib/openzeppelin-contracts/:@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "lib/openzeppelin-contracts-upgradeable/:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
 
-    "lib/middleware-sdk/:@symbiotic/=lib/core/src/"
+    "lib/middleware-sdk/:@symbiotic/=lib/core/src/",
 ]
 
 [rpc_endpoints]
