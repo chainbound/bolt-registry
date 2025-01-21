@@ -33,7 +33,7 @@ import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/Pausea
  * For more information on extensions, see <https://docs.symbiotic.fi/middleware-sdk/extensions>.
  * All public view functions are implemented in the `BaseMiddlewareReader`: <https://docs.symbiotic.fi/middleware-sdk/api-reference/middleware/BaseMiddlewareReader>
  */
-contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
+contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     using Subnetwork for address;
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableMap for EnumerableMap.AddressToAddressMap;
@@ -285,31 +285,38 @@ contract SymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     /**
      * @notice Gets the operator stake for the vault.
      * @param operator The address of the operator.
-     * @param vault The address of the vault.
+     * @param collateral The address of the collateral.
      * @return The operator stake.
      */
-    function getOperatorStake(address operator, address vault) public view returns (uint256) {
+    function getOperatorStake(address operator, address collateral) public view returns (uint256) {
         // TODO(V2): only do this for active operators & vaults?
-        return getOperatorStakeAt(operator, vault, _now());
+        return getOperatorStakeAt(operator, collateral, _now());
     }
 
     /**
      * @notice Gets the operator stake for the vault at a specific timestamp.
      * @param operator The address of the operator.
-     * @param vault The address of the vault.
+     * @param collateral The address of the collateral.
      * @param timestamp The timestamp to get the stake at.
      * @return The operator stake.
      */
-    function getOperatorStakeAt(address operator, address vault, uint48 timestamp) public view returns (uint256) {
+    function getOperatorStakeAt(address operator, address collateral, uint48 timestamp) public view returns (uint256) {
         // TODO(V2): check if vault and operator are registered, associated & active
         // Distinguish between shared vaults and operator vaults
-        // if (!_vaultWhitelist.contains(vault)) {
-        // revert UnauthorizedVault();
-        // }
 
-        // if (!_operatorVaults[operator].contains(vault)) {
-        // revert;
-        // }
+        // Get vault for collateral
+        address vault;
+        for (uint256 i = 0; i < _vaultWhitelist.length(); i++) {
+            (address _vault,,) = _vaultWhitelist.at(i);
+            if (IVaultStorage(_vault).collateral() == collateral) {
+                vault = _vault;
+                break;
+            }
+        }
+
+        if (vault == address(0)) {
+            revert UnauthorizedVault();
+        }
 
         bytes32 networkId = NETWORK.subnetwork(DEFAULT_SUBNETWORK);
         return IBaseDelegator(IVault(vault).delegator()).stakeAt(networkId, operator, timestamp, "");

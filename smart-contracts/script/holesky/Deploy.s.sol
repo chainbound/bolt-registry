@@ -8,7 +8,7 @@ import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol
 
 import {BaseMiddlewareReader} from "@symbiotic/middleware-sdk/middleware/BaseMiddlewareReader.sol";
 
-import {SymbioticMiddlewareV1} from "../../src/holesky/contracts/SymbioticMiddlewareV1.sol";
+import {BoltSymbioticMiddlewareV1} from "../../src/holesky/contracts/BoltSymbioticMiddlewareV1.sol";
 
 contract DeployRegistry is Script {
     function run() public {
@@ -20,9 +20,9 @@ contract DeployRegistry is Script {
         opts.unsafeSkipAllChecks = true;
 
         // TODO:
-        bytes memory initParams = abi.encodeCall(SymbioticMiddlewareV1.initialize, ());
+        // bytes memory initParams = abi.encodeCall(BoltSymbioticMiddlewareV1.initialize, ());
 
-        address middleware = Upgrades.deployUUPSProxy("SymbioticMiddlewareV1", initParams, opts);
-        console.log("Deployed middleware at:", middleware);
+        // address middleware = Upgrades.deployUUPSProxy("SymbioticMiddlewareV1", initParams, opts);
+        // console.log("Deployed middleware at:", middleware);
     }
 }
