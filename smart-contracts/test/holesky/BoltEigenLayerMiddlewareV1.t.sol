@@ -156,7 +156,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         (address[] memory collaterals, uint256[] memory amounts) = middleware.getOperatorCollaterals(operator);
         assertEq(collaterals.length, 2);
         assertEq(amounts.length, 2);
-        
+
         // stEth should have 0 balance
         assertEq(collaterals[0], address(holeskyStEth));
         assertEq(amounts[0], 0);
