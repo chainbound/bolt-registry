@@ -84,7 +84,7 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
      *
      * Total storage slots: 50
      */
-    uint256[35] private __gap;
+    uint256[43] private __gap;
 
     /// @notice The vault delegator types.
     /// @dev <https://docs.symbiotic.fi/modules/vault/introduction#3-limits-and-delegation-logic-module>
