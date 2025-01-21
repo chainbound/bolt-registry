@@ -162,6 +162,14 @@ contract BoltEigenLayerMiddlewareV1 is
         return (strategies, enabled);
     }
 
+    /// @notice Get the active strategies for this AVS
+    /// @return The active strategies
+    function getActiveStrategies() public view returns (IStrategy[] memory) {
+        // Use the beginning of the current epoch to check which strategies were enabled at that time.
+        uint48 timestamp = OPERATORS_REGISTRY.getCurrentEpochStartTimestamp();
+        return _getActiveStrategiesAt(timestamp);
+    }
+
     // ========= AVS Registrar functions ========= //
 
     /// @notice Allows the AllocationManager to hook into the middleware to validate operator registration
@@ -296,12 +304,12 @@ contract BoltEigenLayerMiddlewareV1 is
         uint48 timestamp
     ) internal view returns (IStrategy[] memory) {
         uint256 activeCount = 0;
-        IStrategy[] memory activeStrategies = new IStrategy[](whitelistedStrategies.length());
+        address[] memory activeStrategies = new address[](whitelistedStrategies.length());
         for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
             (address strategy, uint48 enabledAt, uint48 disabledAt) = whitelistedStrategies.at(i);
 
             if (_wasEnabledAt(enabledAt, disabledAt, timestamp)) {
-                activeStrategies[activeCount] = IStrategy(strategy);
+                activeStrategies[activeCount] = strategy;
                 activeCount++;
             }
         }
@@ -309,8 +317,9 @@ contract BoltEigenLayerMiddlewareV1 is
         // Resize the array to the actual number of active strategies
         IStrategy[] memory result = new IStrategy[](activeCount);
         for (uint256 i = 0; i < activeCount; i++) {
-            result[i] = activeStrategies[i];
+            result[i] = IStrategy(activeStrategies[i]);
         }
+        return result;
     }
 
     /// @notice Check if a map entry was active at a given timestamp.

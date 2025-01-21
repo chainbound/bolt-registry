@@ -63,6 +63,15 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         middleware.addStrategyToWhitelist(address(holeskyStEthStrategy));
         middleware.addStrategyToWhitelist(address(holeskyWethStrategy));
 
+        // check that the strategies are whitelisted
+        (address[] memory whitelistedStrategies, bool[] memory statuses) = middleware.getWhitelistedStrategies();
+        assertEq(whitelistedStrategies.length, 2);
+        assertEq(statuses.length, 2);
+        assertEq(whitelistedStrategies[0], address(holeskyStEthStrategy));
+        assertEq(whitelistedStrategies[1], address(holeskyWethStrategy));
+        assertEq(statuses[0], true);
+        assertEq(statuses[1], true);
+
         IStrategy[] memory strategies = new IStrategy[](2);
         strategies[0] = holeskyStEthStrategy;
         strategies[1] = holeskyWethStrategy;
@@ -151,6 +160,10 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
 
         vm.prank(operator);
         holeskyAllocationManager.modifyAllocations(operator, allocs);
+
+        // make sure the strategies are active in the middleware
+        IStrategy[] memory activeStrats = middleware.getActiveStrategies();
+        assertEq(activeStrats.length, 2);
 
         // 5. try to read the operator's collateral directly on the avs
         (address[] memory collaterals, uint256[] memory amounts) = middleware.getOperatorCollaterals(operator);
