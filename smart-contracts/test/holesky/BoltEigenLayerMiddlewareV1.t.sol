@@ -51,7 +51,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
 
         // --- Deploy the OperatorsRegistry ---
         registry = new OperatorsRegistryV1();
-        registry.initialize(admin);
+        registry.initialize(admin, 1 days);
 
         // --- Deploy the EL middleware ---
         middleware = new BoltEigenLayerMiddlewareV1();
@@ -74,7 +74,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         middleware.createOperatorSets(createParams);
 
         // 3. Add the middleware address to the registry
-        registry.updateRestakingMiddleware("EIGENLAYER", address(middleware));
+        registry.updateRestakingMiddleware("EIGENLAYER", middleware);
 
         // 4. Update the metadata URI
         middleware.updateAVSMetadataURI("https://grugbrain.dev");

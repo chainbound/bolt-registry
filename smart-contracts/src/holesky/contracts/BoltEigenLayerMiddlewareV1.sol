@@ -3,7 +3,9 @@ pragma solidity ^0.8.27;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
+
+import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
 import {
     IAllocationManager, IAllocationManagerTypes
@@ -28,7 +30,7 @@ contract BoltEigenLayerMiddlewareV1 is
     IAVSRegistrar,
     IBoltRestakingMiddlewareV1
 {
-    using EnumerableSet for EnumerableSet.AddressSet;
+    using PauseableEnumerableSet for PauseableEnumerableSet.AddressSet;
 
     /// @notice Address of the EigenLayer Allocation Manager contract.
     IAllocationManager public ALLOCATION_MANAGER;
@@ -46,7 +48,7 @@ contract BoltEigenLayerMiddlewareV1 is
     bytes32 public NAME_HASH;
 
     /// @notice The list of whitelisted strategies for this AVS
-    EnumerableSet.AddressSet internal whitelistedStrategies;
+    PauseableEnumerableSet.AddressSet internal whitelistedStrategies;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -62,6 +64,12 @@ contract BoltEigenLayerMiddlewareV1 is
 
     /// @notice Emitted when a strategy is whitelisted
     event StrategyAddedToWhitelist(address strategy);
+
+    /// @notice Emitted when a strategy is paused
+    event StrategyPaused(address strategy);
+
+    /// @notice Emitted when a strategy is unpaused
+    event StrategyUnpaused(address strategy);
 
     /// @notice Emitted when a strategy is removed from the whitelist
     event StrategyRemovedFromWhitelist(address strategy);
@@ -105,22 +113,21 @@ contract BoltEigenLayerMiddlewareV1 is
     function getOperatorCollaterals(
         address operator
     ) public view returns (address[] memory, uint256[] memory) {
-        address[] memory collateralTokens = new address[](whitelistedStrategies.length());
-        uint256[] memory amounts = new uint256[](whitelistedStrategies.length());
+        // Use the beginning of the current epoch to check which strategies were enabled at that time.
+        // Only the strategies enabled at the beginning of the epoch are considered for the operator's collateral.
+        uint48 timestamp = OPERATORS_REGISTRY.getCurrentEpochStartTimestamp();
+        IStrategy[] memory activeStrategies = _getActiveStrategiesAt(timestamp);
 
-        // cast strategies to IStrategy; this should be zero-cost but Solidity doesn't allow it directly
-        IStrategy[] memory strategies = new IStrategy[](whitelistedStrategies.length());
-        for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
-            strategies[i] = IStrategy(whitelistedStrategies.at(i));
-        }
+        address[] memory collateralTokens = new address[](activeStrategies.length);
+        uint256[] memory amounts = new uint256[](activeStrategies.length);
 
         // get the shares of the operator across all strategies
-        uint256[] memory shares = DELEGATION_MANAGER.getOperatorShares(operator, strategies);
+        uint256[] memory shares = DELEGATION_MANAGER.getOperatorShares(operator, activeStrategies);
 
         // get the collateral tokens and amounts for the operator across all strategies
-        for (uint256 i = 0; i < strategies.length; i++) {
-            collateralTokens[i] = address(strategies[i].underlyingToken());
-            amounts[i] = strategies[i].sharesToUnderlyingView(shares[i]);
+        for (uint256 i = 0; i < activeStrategies.length; i++) {
+            collateralTokens[i] = address(activeStrategies[i].underlyingToken());
+            amounts[i] = activeStrategies[i].sharesToUnderlyingView(shares[i]);
         }
 
         return (collateralTokens, amounts);
@@ -136,10 +143,23 @@ contract BoltEigenLayerMiddlewareV1 is
         return 0;
     }
 
-    /// @notice Get the list of whitelisted strategies for this AVS
+    /// @notice Get the list of whitelisted strategies for this AVS and whether they are enabled
     /// @return The list of whitelisted strategies
-    function getWhitelistedStrategies() public view returns (address[] memory) {
-        return whitelistedStrategies.values();
+    function getWhitelistedStrategies() public view returns (address[] memory, bool[] memory) {
+        address[] memory strategies = new address[](whitelistedStrategies.length());
+        bool[] memory enabled = new bool[](whitelistedStrategies.length());
+
+        // Use the beginning of the current epoch to check which strategies were enabled at that time.
+        uint48 timestamp = OPERATORS_REGISTRY.getCurrentEpochStartTimestamp();
+
+        for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
+            (address strategy, uint48 enabledAt, uint48 disabledAt) = whitelistedStrategies.at(i);
+
+            strategies[i] = strategy;
+            enabled[i] = _wasEnabledAt(enabledAt, disabledAt, timestamp);
+        }
+
+        return (strategies, enabled);
     }
 
     // ========= AVS Registrar functions ========= //
@@ -165,8 +185,10 @@ contract BoltEigenLayerMiddlewareV1 is
         // called by operators when deregistering from this AVS.
         // Failure does nothing here: if this call reverts the deregistration will still go through.
 
-        // We forward the call to the OperatorsRegistry to deregister the operator from its storage.
-        OPERATORS_REGISTRY.deregisterOperator(operator);
+        // We forward the call to the OperatorsRegistry to pause the operator from its storage.
+        // In order to be fully removed, the operator must call OPERATORS_REGISTRY.deregisterOperator()
+        // after waiting for the required delay.
+        OPERATORS_REGISTRY.pauseOperator(operator);
     }
 
     // ========= Admin functions ========= //
@@ -180,18 +202,41 @@ contract BoltEigenLayerMiddlewareV1 is
         require(!whitelistedStrategies.contains(strategy), "Strategy already whitelisted");
         require(STRATEGY_MANAGER.strategyIsWhitelistedForDeposit(IStrategy(strategy)), "Strategy not allowed");
 
-        whitelistedStrategies.add(strategy);
+        whitelistedStrategies.register(Time.timestamp(), strategy);
         emit StrategyAddedToWhitelist(strategy);
+    }
+
+    /// @notice Pause a strategy, preventing its collateral from being active in the AVS
+    /// @param strategy The strategy to pause
+    function pauseStrategy(
+        address strategy
+    ) public onlyOwner {
+        require(whitelistedStrategies.contains(strategy), "Strategy not whitelisted");
+
+        whitelistedStrategies.pause(Time.timestamp(), strategy);
+        emit StrategyPaused(strategy);
+    }
+
+    /// @notice Unpause a strategy, allowing its collateral to be active in the AVS
+    /// @param strategy The strategy to unpause
+    function unpauseStrategy(
+        address strategy
+    ) public onlyOwner {
+        require(whitelistedStrategies.contains(strategy), "Strategy not whitelisted");
+
+        whitelistedStrategies.unpause(Time.timestamp(), OPERATORS_REGISTRY.EPOCH_DURATION(), strategy);
+        emit StrategyUnpaused(strategy);
     }
 
     /// @notice Remove a strategy from the whitelist
     /// @param strategy The strategy to remove
+    /// @dev Strategies must be paused for an EPOCH_DURATION before they can be removed
     function removeStrategyFromWhitelist(
         address strategy
     ) public onlyOwner {
         require(whitelistedStrategies.contains(strategy), "Strategy not whitelisted");
 
-        whitelistedStrategies.remove(strategy);
+        whitelistedStrategies.unregister(Time.timestamp(), OPERATORS_REGISTRY.EPOCH_DURATION(), strategy);
         emit StrategyRemovedFromWhitelist(strategy);
     }
 
@@ -242,5 +287,38 @@ contract BoltEigenLayerMiddlewareV1 is
         for (uint256 i = 0; i < strategies.length; i++) {
             require(whitelistedStrategies.contains(address(strategies[i])), "Strategy not whitelisted");
         }
+    }
+
+    /// @notice Get all the active strategies at a given timestamp
+    /// @param timestamp The timestamp to get the active strategies at
+    /// @return The array of active strategies
+    function _getActiveStrategiesAt(
+        uint48 timestamp
+    ) internal view returns (IStrategy[] memory) {
+        uint256 activeCount = 0;
+        IStrategy[] memory activeStrategies = new IStrategy[](whitelistedStrategies.length());
+        for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
+            (address strategy, uint48 enabledAt, uint48 disabledAt) = whitelistedStrategies.at(i);
+
+            if (_wasEnabledAt(enabledAt, disabledAt, timestamp)) {
+                activeStrategies[activeCount] = IStrategy(strategy);
+                activeCount++;
+            }
+        }
+
+        // Resize the array to the actual number of active strategies
+        IStrategy[] memory result = new IStrategy[](activeCount);
+        for (uint256 i = 0; i < activeCount; i++) {
+            result[i] = activeStrategies[i];
+        }
+    }
+
+    /// @notice Check if a map entry was active at a given timestamp.
+    /// @param enabledAt The enabled time of the map entry.
+    /// @param disabledAt The disabled time of the map entry.
+    /// @param timestamp The timestamp to check the map entry status at.
+    /// @return True if the map entry was active at the given timestamp, false otherwise.
+    function _wasEnabledAt(uint48 enabledAt, uint48 disabledAt, uint48 timestamp) internal pure returns (bool) {
+        return enabledAt != 0 && enabledAt <= timestamp && (disabledAt == 0 || disabledAt >= timestamp);
     }
 }
