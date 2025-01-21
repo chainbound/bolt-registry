@@ -4,6 +4,7 @@ pragma solidity ^0.8.25;
 import {Test, console} from "forge-std/Test.sol";
 
 import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
+import {IOperatorsRegistryV1} from "../../src/holesky/interfaces/IOperatorsRegistryV1.sol";
 import {BoltSymbioticMiddlewareV1} from "../../src/holesky/contracts/BoltSymbioticMiddlewareV1.sol";
 
 import {IOperatorRegistry} from "@symbiotic/core/interfaces/IOperatorRegistry.sol";
@@ -53,6 +54,9 @@ contract SymbioticMiddlewareTest is Test {
         registry.initialize(admin);
 
         middleware = new BoltSymbioticMiddlewareV1();
+        // Set the restaking middleware
+        registry.updateRestakingMiddleware("SYMBIOTIC", address(middleware));
+
         vm.stopPrank();
 
         address networkRegistry = INetworkMiddlewareService(networkMiddlewareService).NETWORK_REGISTRY();
@@ -77,10 +81,12 @@ contract SymbioticMiddlewareTest is Test {
         IOptInService(operatorNetOptin).optIn(network);
 
         // Bolt registration
-        middleware.registerOperator();
-        vm.stopPrank();
+        vm.expectEmit();
+        emit IOperatorsRegistryV1.OperatorRegistered(operator, "https://rpc.boltprotocol.xyz", address(middleware));
 
-        assertEq(middleware.operatorsLength(), 1);
+        middleware.registerOperator("https://rpc.boltprotocol.xyz");
+
+        vm.stopPrank();
     }
 
     function testWhitelistVault() public {
