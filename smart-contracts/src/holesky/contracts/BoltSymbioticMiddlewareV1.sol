@@ -21,6 +21,8 @@ import {INetworkMiddlewareService} from "@symbiotic/core/interfaces/service/INet
 
 import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
+import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
+
 /**
  * @title SymbioticMiddlewareV1
  * @author Chainbound Developers <dev@chainbound.io>
@@ -48,7 +50,7 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     uint48 public START_TIMESTAMP;
 
     /// @notice The address of the bolt registry
-    address public BOLT_REGISTRY;
+    IOperatorsRegistryV1 public OPERATORS_REGISTRY;
 
     /// @notice The Symbiotic network: address(this)
     address public NETWORK;
@@ -73,9 +75,6 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
 
     /// @notice The set of whitelisted vaults for the network.
     PauseableEnumerableSet.AddressSet private _vaultWhitelist;
-
-    /// @notice The set of registered operators.
-    PauseableEnumerableSet.AddressSet private _operators;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -125,7 +124,7 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     function initialize(
         address owner,
         address network,
-        address boltRegistry,
+        address boltOperatorsRegistry,
         uint48 epochDuration,
         uint48 slashingWindow,
         address vaultRegistry,
@@ -135,7 +134,7 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         __Ownable_init(owner);
 
         NETWORK = network;
-        BOLT_REGISTRY = boltRegistry;
+        OPERATORS_REGISTRY = IOperatorsRegistryV1(boltOperatorsRegistry);
         SLASHING_WINDOW = slashingWindow;
         EPOCH_DURATION = epochDuration;
         VAULT_REGISTRY = vaultRegistry;
@@ -156,7 +155,9 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     /**
      * @notice Register an operator in the registry
      */
-    function registerOperator() public {
+    function registerOperator(
+        string calldata rpcEndpoint
+    ) public {
         if (!IRegistry(OPERATOR_REGISTRY).isEntity(msg.sender)) {
             revert NotOperator();
         }
@@ -165,37 +166,17 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
             revert OperatorNotOptedIn();
         }
 
-        _operators.register(_now(), msg.sender);
+        OPERATORS_REGISTRY.registerOperator(msg.sender, rpcEndpoint);
     }
 
     /**
      * @notice Deregister an operator from the registry
      */
     function deregisterOperator() public {
-        _operators.unregister(_now(), SLASHING_WINDOW, msg.sender);
+        OPERATORS_REGISTRY.deregisterOperator(msg.sender);
 
         // TODO(V3): in the future we may not want to remove the vaults immediately, in case
         // of a pending penalty that the operator is trying to avoid.
-    }
-
-    /**
-     * @notice Pause an operator
-     * @param operator The address of the operator
-     */
-    function pauseOperator(
-        address operator
-    ) public onlyOwner {
-        _operators.pause(_now(), operator);
-    }
-
-    /**
-     * @notice Unpause an operator
-     * @param operator The address of the operator
-     */
-    function unpauseOperator(
-        address operator
-    ) public onlyOwner {
-        _operators.unpause(_now(), SLASHING_WINDOW, operator);
     }
 
     // ================ OPERATOR VIEW METHODS =================== //
@@ -256,13 +237,6 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         }
 
         return (tokens, amounts);
-    }
-
-    /**
-     * @notice Returns the total number of registered operators
-     */
-    function operatorsLength() public view returns (uint256) {
-        return _operators.length();
     }
 
     // ================ VAULTS ===================== //
