@@ -138,9 +138,31 @@ contract BoltEigenLayerMiddlewareV1 is
     /// @param collateral The collateral token address
     /// @return The amount staked by the operator for the collateral
     function getOperatorStake(address operator, address collateral) public view returns (uint256) {
-        // TODO: impl
+        // Use the beginning of the current epoch to check which strategies were enabled at that time.
+        // Only the strategies enabled at the beginning of the epoch are considered for the operator's stake.
+        uint48 timestamp = OPERATORS_REGISTRY.getCurrentEpochStartTimestamp();
 
-        return 0;
+        uint256 activeStake = 0;
+        for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
+            (address strategy, uint48 enabledAt, uint48 disabledAt) = whitelistedStrategies.at(i);
+
+            if (!_wasEnabledAt(enabledAt, disabledAt, timestamp)) {
+                continue;
+            }
+
+            if (address(IStrategy(strategy).underlyingToken()) != collateral) {
+                continue;
+            }
+
+            // get the shares of the operator for the strategy
+            IStrategy[] memory strategies = new IStrategy[](1);
+            strategies[0] = IStrategy(strategy);
+            uint256[] memory shares = DELEGATION_MANAGER.getOperatorShares(operator, strategies);
+            activeStake = IStrategy(strategy).sharesToUnderlyingView(shares[0]);
+            break;
+        }
+
+        return activeStake;
     }
 
     /// @notice Get the list of whitelisted strategies for this AVS and whether they are enabled
