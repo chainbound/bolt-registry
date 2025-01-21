@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.25;
+pragma solidity ^0.8.27;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -22,6 +22,7 @@ import {INetworkMiddlewareService} from "@symbiotic/core/interfaces/service/INet
 import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
 import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
+import {IBoltRestakingMiddlewareV1} from "../interfaces/IBoltRestakingMiddlewareV1.sol";
 
 /**
  * @title SymbioticMiddlewareV1
@@ -35,7 +36,7 @@ import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
  * For more information on extensions, see <https://docs.symbiotic.fi/middleware-sdk/extensions>.
  * All public view functions are implemented in the `BaseMiddlewareReader`: <https://docs.symbiotic.fi/middleware-sdk/api-reference/middleware/BaseMiddlewareReader>
  */
-contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
+contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgradeable, UUPSUpgradeable {
     using Subnetwork for address;
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableMap for EnumerableMap.AddressToAddressMap;
@@ -45,6 +46,9 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     //
     // Most of these constants replicate view methods in the BaseMiddlewareReader.
     // See <https://docs.symbiotic.fi/middleware-sdk/api-reference/middleware/BaseMiddlewareReader> for more information.
+
+    /// @notice The name hash of this middleware.
+    bytes32 public NAME_HASH;
 
     /// @notice The timestamp of the first epoch (when this contract gets initialized).
     uint48 public START_TIMESTAMP;
@@ -147,6 +151,7 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         OPERATOR_REGISTRY = operatorRegistry;
         OPERATOR_NET_OPTIN = operatorNetOptin;
         START_TIMESTAMP = _now();
+        NAME_HASH = keccak256("SYMBIOTIC");
     }
 
     function _authorizeUpgrade(

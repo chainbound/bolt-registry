@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.25;
+pragma solidity ^0.8.27;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 
 import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
+import {IBoltRestakingMiddlewareV1} from "../interfaces/IBoltRestakingMiddlewareV1.sol";
 import {OperatorsLibV1} from "../lib/OperatorsLibV1.sol";
 
 /// @title OperatorsRegistryV1
@@ -12,14 +14,20 @@ import {OperatorsLibV1} from "../lib/OperatorsLibV1.sol";
 contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsRegistryV1 {
     using OperatorsLibV1 for OperatorsLibV1.OperatorMap;
 
+    /// @notice The start timestamp of the contract, used as reference for time-based operations
+    uint48 public START_TIMESTAMP;
+
+    /// @notice The duration of an epoch in seconds, used for delaying opt-in/out operations
+    uint48 public EPOCH_DURATION;
+
     /// @notice The set of bolt operators, indexed by their signer address
     OperatorsLibV1.OperatorMap private OPERATORS;
 
     /// @notice the address of the EigenLayer restaking middleware
-    address public EIGENLAYER_RESTAKING_MIDDLEWARE;
+    IBoltRestakingMiddlewareV1 public EIGENLAYER_RESTAKING_MIDDLEWARE;
 
     /// @notice The address of the Symbiotic restaking middleware
-    address public SYMBIOTIC_RESTAKING_MIDDLEWARE;
+    IBoltRestakingMiddlewareV1 public SYMBIOTIC_RESTAKING_MIDDLEWARE;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -29,16 +37,17 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
      *
      * Total storage slots: 50
      */
-    uint256[45] private __gap;
+    uint256[43] private __gap;
 
     // ========= Initializer & Proxy functionality ========= //
 
     /// @notice Initialize the contract
     /// @param owner The address of the owner
-    function initialize(
-        address owner
-    ) public initializer {
+    function initialize(address owner, uint48 epochDuration) public initializer {
         __Ownable_init(owner);
+
+        START_TIMESTAMP = uint48(block.timestamp);
+        EPOCH_DURATION = epochDuration;
     }
 
     /// @notice Upgrade the contract
@@ -59,15 +68,23 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
         _;
     }
 
+    // ========= Public helpers ========= //
+
+    /// @notice Returns the timestamp of when the current epoch started
+    function getCurrentEpochStartTimestamp() public view returns (uint48) {
+        uint48 currentEpoch = (Time.timestamp() - START_TIMESTAMP) / EPOCH_DURATION;
+        return START_TIMESTAMP + currentEpoch * EPOCH_DURATION;
+    }
+
     // ========= Operators functions ========= //
     //
     // The operator lifecycle looks as follows:
     // 1. Register, and become active immediately. The operator can then manage their
-    //    restaking positions through the EL AllocationManager contract.
-    // 2. Pause, and become inactive (with a delay). The operator won't be slashable anymore,
+    //    restaking positions through the restaking protocol.
+    // 2. Pause, and become inactive. After a delay, the operator won't be slashable anymore,
     //    but they can still manage and rebalance their positions.
-    // 3. Unpause, and become active again (with a delay). The operator can be slashed again.
-    // 4. Deregister, and become inactive (with a delay). The operator won't be part of the AVS anymore.
+    // 3. Unpause, and become active again. After a delay, the operator can be slashed again.
+    // 4. Deregister, and become inactive. After a delay, the operator won't be part of the AVS anymore.
 
     /// @notice Register an operator in the registry
     /// @param signer The address of the operator
@@ -151,8 +168,11 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @notice Update the address of a restaking middleware contract address
     /// @param restakingProtocol The name of the restaking protocol
     /// @param newMiddleware The address of the new restaking middleware
-    function updateRestakingMiddleware(string calldata restakingProtocol, address newMiddleware) public onlyOwner {
-        require(newMiddleware != address(0), "Invalid middleware address");
+    function updateRestakingMiddleware(
+        string calldata restakingProtocol,
+        IBoltRestakingMiddlewareV1 newMiddleware
+    ) public onlyOwner {
+        require(address(newMiddleware) != address(0), "Invalid middleware address");
 
         bytes32 protocolNameHash = keccak256(abi.encodePacked(restakingProtocol));
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.25;
+pragma solidity ^0.8.27;
 
 import {Test, console} from "forge-std/Test.sol";
 
@@ -51,11 +51,11 @@ contract SymbioticMiddlewareTest is Test {
         vm.startPrank(admin);
 
         registry = new OperatorsRegistryV1();
-        registry.initialize(admin);
+        registry.initialize(admin, 1 days);
 
         middleware = new BoltSymbioticMiddlewareV1();
         // Set the restaking middleware
-        registry.updateRestakingMiddleware("SYMBIOTIC", address(middleware));
+        registry.updateRestakingMiddleware("SYMBIOTIC", middleware);
 
         vm.stopPrank();
 
