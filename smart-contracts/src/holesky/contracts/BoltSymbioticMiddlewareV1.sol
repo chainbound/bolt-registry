@@ -185,8 +185,10 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         // of a pending penalty that the operator is trying to avoid.
     }
 
-    /// @notice Update your RPC endpoint as an operator.
-    /// @param rpcEndpoint The new rpc endpoint.
+    /**
+     * @notice Update your RPC endpoint as an operator.
+     * @param rpcEndpoint The new rpc endpoint.
+     */
     function updateOperatorRpcEndpoint(
         string calldata rpcEndpoint
     ) public {
