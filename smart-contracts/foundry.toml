@@ -19,12 +19,21 @@ remappings = [
     "@symbiotic/middleware-sdk/=lib/middleware-sdk/src/",
     "@symbiotic/core/=lib/core/src/",
 
+    "@eigenlayer/=lib/eigenlayer-contracts/",
+
+    # Access the EigenLayer dependencies. Needed for tests.
+    "@openzeppelin/contracts-eigenlayer/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/contracts/",
 
     # OpenZeppelin remappings contexts
     "lib/openzeppelin-contracts/:@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "lib/openzeppelin-contracts-upgradeable/:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
 
     "lib/middleware-sdk/:@symbiotic/=lib/core/src/",
+    # EigenLayer remapping contexts
+    "lib/eigenlayer-contracts/:@openzeppelin-upgrades/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0/",
+    "lib/eigenlayer-contracts/:@openzeppelin/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/",
+    "lib/eigenlayer-contracts/:ds-test/=lib/eigenlayer-contracts/lib/ds-test/src/",
+    "lib/eigenlayer-contracts/:forge-std/=lib/eigenlayer-contracts/lib/forge-std/src/",
 ]
 
 [rpc_endpoints]

@@ -16,3 +16,7 @@
 [submodule "smart-contracts/lib/openzeppelin-foundry-upgrades"]
 	path = smart-contracts/lib/openzeppelin-foundry-upgrades
 	url = https://github.com/OpenZeppelin/openzeppelin-foundry-upgrades
+[submodule "smart-contracts/lib/eigenlayer-contracts"]
+	path = smart-contracts/lib/eigenlayer-contracts
+	url = https://github.com/Layr-Labs/eigenlayer-contracts
+	branch = slashing-magnitudes

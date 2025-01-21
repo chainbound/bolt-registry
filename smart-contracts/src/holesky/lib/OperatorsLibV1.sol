@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
+import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
 /// @title Operators Library
@@ -29,7 +30,7 @@ library OperatorsLibV1 {
     /// @param signer The address of the operator
     /// @dev This is used to pause an operator, considering them "inactive" until they are unpaused.
     function pause(OperatorMap storage self, address signer) internal {
-        self._keys.pause(uint48(block.timestamp), signer);
+        self._keys.pause(Time.timestamp(), signer);
     }
 
     /// @notice Unpause an operator in the map
@@ -37,7 +38,7 @@ library OperatorsLibV1 {
     /// @param signer The address of the operator
     /// @dev This is used to unpause an operator that was paused at least IMMUTABLE_PERIOD ago.
     function unpause(OperatorMap storage self, address signer) internal {
-        self._keys.unpause(uint48(block.timestamp), IMMUTABLE_PERIOD, signer);
+        self._keys.unpause(Time.timestamp(), IMMUTABLE_PERIOD, signer);
     }
 
     /// @notice Add an operator to the map, considering it active.
@@ -54,7 +55,7 @@ library OperatorsLibV1 {
         require(signer != address(0), "Invalid operator address");
         require(bytes(rpcEndpoint).length > 0, "Invalid rpc endpoint");
 
-        self._keys.register(uint48(block.timestamp), signer);
+        self._keys.register(Time.timestamp(), signer);
         self._values[signer] = Operator(signer, rpcEndpoint, restakingMiddleware);
     }
 
@@ -63,7 +64,7 @@ library OperatorsLibV1 {
     /// @param signer The address of the operator
     /// @dev Operators need to be paused and wait for IMMUTABLE_PERIOD before they can be removed.
     function remove(OperatorMap storage self, address signer) internal {
-        self._keys.unregister(uint48(block.timestamp), IMMUTABLE_PERIOD, signer);
+        self._keys.unregister(Time.timestamp(), IMMUTABLE_PERIOD, signer);
         delete self._values[signer];
     }
 
@@ -107,7 +108,7 @@ library OperatorsLibV1 {
     function getAllActive(
         OperatorMap storage self
     ) internal view returns (Operator[] memory) {
-        address[] memory keys = self._keys.getActive(uint48(block.timestamp));
+        address[] memory keys = self._keys.getActive(Time.timestamp());
         Operator[] memory operators = new Operator[](keys.length);
 
         for (uint256 i = 0; i < keys.length; i++) {
@@ -126,7 +127,7 @@ library OperatorsLibV1 {
         address signer
     ) internal view returns (Operator memory operator, bool isActive) {
         require(self._keys.contains(signer), "Operator does not exist");
-        isActive = self._keys.wasActiveAt(uint48(block.timestamp), signer);
+        isActive = self._keys.wasActiveAt(Time.timestamp(), signer);
         operator = self._values[signer];
     }
 
