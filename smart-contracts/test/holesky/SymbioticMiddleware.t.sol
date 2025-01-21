@@ -12,10 +12,16 @@ import {IVaultFactory} from "@symbiotic/core/interfaces/IVaultFactory.sol";
 import {IVault} from "@symbiotic/core/interfaces/vault/IVault.sol";
 import {IVaultStorage} from "@symbiotic/core/interfaces/vault/IVaultStorage.sol";
 import {INetworkRestakeDelegator} from "@symbiotic/core/interfaces/delegator/INetworkRestakeDelegator.sol";
+import {INetworkMiddlewareService} from "@symbiotic/core/interfaces/service/INetworkMiddlewareService.sol";
+import {INetworkRegistry} from "@symbiotic/core/interfaces/INetworkRegistry.sol";
+import {IBaseDelegator} from "@symbiotic/core/interfaces/delegator/IBaseDelegator.sol";
+import {Subnetwork} from "@symbiotic/core/contracts/libraries/Subnetwork.sol";
 
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 contract SymbioticMiddlewareTest is Test {
+    using Subnetwork for address;
+
     OperatorsRegistryV1 registry;
     BoltSymbioticMiddlewareV1 middleware;
 
@@ -23,8 +29,10 @@ contract SymbioticMiddlewareTest is Test {
     IERC20 wstEth = IERC20(0x8d09a4502Cc8Cf1547aD300E066060D043f6982D);
 
     address admin;
+    address network;
     address operator;
 
+    address vaultAdmin = 0xe8616DEcea16b5216e805B0b8caf7784de7570E7;
     address networkMiddlewareService = 0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3;
     address vaultRegistry = 0x407A039D94948484D356eFB765b3c74382A050B4;
     address vaultOptinService = 0x95CC0a052ae33941877c9619835A233D21D57351;
@@ -35,6 +43,7 @@ contract SymbioticMiddlewareTest is Test {
         vm.createSelectFork("https://geth-holesky.bolt.chainbound.io");
 
         admin = makeAddr("admin");
+        network = makeAddr("network");
         operator = makeAddr("operator");
         vm.deal(admin, 1000 ether);
 
@@ -44,19 +53,18 @@ contract SymbioticMiddlewareTest is Test {
         registry.initialize(admin);
 
         middleware = new BoltSymbioticMiddlewareV1();
+        vm.stopPrank();
 
-        // function initialize(
-        //     address owner,
-        //     address boltRegistry,
-        //     address networkMiddlewareService,
-        //     uint48 epochDuration,
-        //     uint48 slashingWindow,
-        //     address vaultRegistry,
-        //     address operatorRegistry,
-        //     address operatorNetOptin
-        // ) public initializer {
+        address networkRegistry = INetworkMiddlewareService(networkMiddlewareService).NETWORK_REGISTRY();
+
+        // Register network
+        vm.startPrank(network);
+        INetworkRegistry(networkRegistry).registerNetwork();
+
+        INetworkMiddlewareService(networkMiddlewareService).setMiddleware(address(middleware));
+
         middleware.initialize(
-            admin, address(registry), networkMiddlewareService, 0, 0, vaultRegistry, operatorRegistry, operatorNetOptin
+            admin, network, address(registry), 0, 0, vaultRegistry, operatorRegistry, operatorNetOptin
         );
 
         vm.stopPrank();
@@ -66,7 +74,7 @@ contract SymbioticMiddlewareTest is Test {
         vm.startPrank(operator);
         // Symbiotic registration
         IOperatorRegistry(operatorRegistry).registerOperator();
-        IOptInService(operatorNetOptin).optIn(address(middleware));
+        IOptInService(operatorNetOptin).optIn(network);
 
         // Bolt registration
         middleware.registerOperator();
@@ -81,30 +89,51 @@ contract SymbioticMiddlewareTest is Test {
 
         // Bolt registration
         vm.expectRevert(BoltSymbioticMiddlewareV1.NotVault.selector);
-        middleware.whitelistVault(address(0), 10 ether);
+        middleware.whitelistVault(address(0));
 
-        middleware.whitelistVault(address(wstEthVault), 10 ether);
+        middleware.whitelistVault(address(wstEthVault));
         assertEq(middleware.vaultWhitelistLength(), 1);
 
-        // middleware.whitelistVault();
         vm.stopPrank();
     }
 
     function testDeposit() public {
         vm.startPrank(admin);
-        middleware.whitelistVault(address(wstEthVault), 10 ether);
+        middleware.whitelistVault(address(wstEthVault));
         vm.stopPrank();
 
+        vm.startPrank(network);
+        // Set the max network limit for the vault as the network
+        IBaseDelegator(wstEthVault.delegator()).setMaxNetworkLimit(0, 10 ether);
+        vm.stopPrank();
+
+        // Set the network limit for this network (as the curator)
+        vm.startPrank(vaultAdmin);
+        INetworkRestakeDelegator(wstEthVault.delegator()).setNetworkLimit(network.subnetwork(0), 10 ether);
+
         assertEq(middleware.getOperatorStake(operator, address(wstEth)), 0);
+
+        // Mint operator shares (need to be vault admin / curator)
+        INetworkRestakeDelegator(wstEthVault.delegator()).setOperatorNetworkShares(
+            network.subnetwork(0), operator, 1 ether
+        );
+        vm.stopPrank();
+
+        assertEq(
+            INetworkRestakeDelegator(wstEthVault.delegator()).operatorNetworkShares(network.subnetwork(0), operator),
+            1 ether
+        );
+
+        assertEq(
+            INetworkRestakeDelegator(wstEthVault.delegator()).totalOperatorNetworkShares(network.subnetwork(0)), 1 ether
+        );
 
         vm.startPrank(operator);
 
         IOperatorRegistry(operatorRegistry).registerOperator();
-        IOptInService(operatorNetOptin).optIn(address(middleware));
+        IOptInService(operatorNetOptin).optIn(network);
 
         IOptInService(vaultOptinService).optIn(address(wstEthVault));
-
-        INetworkRestakeDelegator(wstEthVault.delegator());
 
         // --- Add stake to the Vault ---
         deal(address(wstEth), operator, 1 ether);
@@ -116,11 +145,15 @@ contract SymbioticMiddlewareTest is Test {
 
         assertEq(depositedAmount, 1 ether);
         assertEq(mintedShares, 1 ether);
-        // assertEq(wstEthVault.slashableBalanceOf(operator), 1 ether);
-        // assertEq(wstEth.balanceOf(address(wstEthVault)), 1 ether);
 
-        vm.warp(block.timestamp + IVaultStorage(address(wstEthVault)).epochDuration() + 1);
+        assert(wstEth.balanceOf(address(wstEthVault)) >= 1 ether);
 
-        assertEq(middleware.getOperatorStake(operator, address(wstEth)), 1 ether);
+        // TODO: why is this different than getOperatorStake below?
+        assertEq(wstEthVault.slashableBalanceOf(operator), 1 ether);
+
+        // All stake is active for this operator, because operatorShares == totalShares
+        // stake = operatorShares * min(activeStake, networkLimit) / totalShares
+        uint256 activeStake = wstEthVault.activeStake();
+        assertEq(middleware.getOperatorStake(operator, address(wstEth)), activeStake);
     }
 }

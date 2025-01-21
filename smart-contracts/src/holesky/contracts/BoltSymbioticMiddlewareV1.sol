@@ -74,15 +74,6 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     /// @notice The set of whitelisted vaults for the network.
     PauseableEnumerableSet.AddressSet private _vaultWhitelist;
 
-    /// @notice The set of operator-specific vaults for each operator.
-    mapping(address => PauseableEnumerableSet.AddressSet) private _operatorVaults;
-
-    /// @notice The set of shared vaults.
-    PauseableEnumerableSet.AddressSet private _sharedVaults;
-
-    /// @notice Vaults to operators mapping.
-    EnumerableMap.AddressToAddressMap private _vaultOperator;
-
     /// @notice The set of registered operators.
     PauseableEnumerableSet.AddressSet private _operators;
 
@@ -123,7 +114,7 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     /**
      * @notice Constructor for initializing the SymbioticMiddlewareV1 contract
      * @param owner The address of the owner
-     * @param networkMiddlewareService The address of the network middleware service
+     * @param network The address of the network
      * @param slashingWindow The duration of the slashing window (unused in V1)
      * @param vaultRegistry The address of the vault registry
      * @param operatorRegistry The address of the operator registry
@@ -133,8 +124,8 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
      */
     function initialize(
         address owner,
+        address network,
         address boltRegistry,
-        address networkMiddlewareService,
         uint48 epochDuration,
         uint48 slashingWindow,
         address vaultRegistry,
@@ -143,52 +134,19 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     ) public initializer {
         __Ownable_init(owner);
 
-        // Initialize the network with Symbiotic
-        _initializeNetwork(networkMiddlewareService);
-
+        NETWORK = network;
         BOLT_REGISTRY = boltRegistry;
         SLASHING_WINDOW = slashingWindow;
         EPOCH_DURATION = epochDuration;
         VAULT_REGISTRY = vaultRegistry;
         OPERATOR_REGISTRY = operatorRegistry;
         OPERATOR_NET_OPTIN = operatorNetOptin;
+        START_TIMESTAMP = _now();
     }
 
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}
-
-    /**
-     * @notice Initialize the network with the network middleware service.
-     * @param networkMiddlewareService The address of the network middleware service.
-     * @dev IMPORTANT: This MUST only be called once, in the first initializer.
-     */
-    function _initializeNetwork(
-        address networkMiddlewareService
-    ) public onlyOwner {
-        address networkRegistry = INetworkMiddlewareService(networkMiddlewareService).NETWORK_REGISTRY();
-
-        INetworkRegistry(networkRegistry).registerNetwork();
-
-        // Set the middleware
-        INetworkMiddlewareService(networkMiddlewareService).setMiddleware(address(this));
-
-        NETWORK = address(this);
-        START_TIMESTAMP = _now();
-    }
-
-    // TODO:
-    // - Key management
-    // - Network management (this contract is the network)
-    // - Operator
-    //     - Operator registration
-    //     - Operator deregistration
-    //     - Operator pausing / unpausing
-    // - Vaults
-    //     - Shared vault registration / deregistration
-    //     - Vault pausing / unpausing
-    //     - Vault collateral tracking
-    //     - Vault whitelisting
 
     // ================ OPERATORS ===================== //
     //
@@ -211,28 +169,6 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Register an operator -> vault association.
-     * @param operator The address of the operator
-     * @param vault The address of the vault
-     */
-    function registerOperatorVault(address operator, address vault) public {
-        if (!_operators.contains(operator)) {
-            revert OperatorNotRegistered();
-        }
-
-        // Only allow registration of whitelisted vaults
-        if (!_vaultWhitelist.contains(vault)) {
-            revert UnauthorizedVault();
-        }
-
-        // Validate vault type
-        _validateOperatorVault(operator, vault);
-
-        _operatorVaults[operator].register(_now(), vault);
-        _vaultOperator.set(vault, operator);
-    }
-
-    /**
      * @notice Deregister an operator from the registry
      */
     function deregisterOperator() public {
@@ -240,24 +176,6 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
 
         // TODO(V3): in the future we may not want to remove the vaults immediately, in case
         // of a pending penalty that the operator is trying to avoid.
-        PauseableEnumerableSet.AddressSet storage vaults = _operatorVaults[msg.sender];
-        delete _operatorVaults[msg.sender];
-
-        for (uint256 i = 0; i < vaults.length(); i++) {
-            (address vault,,) = vaults.at(i);
-            _vaultOperator.remove(vault);
-        }
-    }
-
-    /**
-     * @notice Deregister an operator vault from the registry
-     * @param vault The address of the vault
-     */
-    function deregisterOperatorVault(
-        address vault
-    ) public {
-        _operatorVaults[msg.sender].unregister(_now(), SLASHING_WINDOW, vault);
-        _vaultOperator.remove(vault);
     }
 
     /**
@@ -353,15 +271,14 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
      * @notice Whitelists a vault for the network.
      * @param vault The address of the vault
      */
-    function whitelistVault(address vault, uint256 networkLimit) public onlyOwner {
+    function whitelistVault(
+        address vault
+    ) public onlyOwner {
         // Validate the vault
         _validateVault(vault);
 
         // Registers and enables the vault
         _vaultWhitelist.register(_now(), vault);
-
-        // Set the max network limit for the vault
-        IBaseDelegator(IVault(vault).delegator()).setMaxNetworkLimit(DEFAULT_SUBNETWORK, networkLimit);
     }
 
     /**
@@ -372,11 +289,6 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         address vault
     ) public onlyOwner {
         _vaultWhitelist.unregister(_now(), SLASHING_WINDOW, vault);
-        _sharedVaults.unregister(_now(), SLASHING_WINDOW, vault);
-        _vaultOperator.remove(vault);
-
-        // Set the max network limit for the vault to 0
-        IBaseDelegator(IVault(vault).delegator()).setMaxNetworkLimit(DEFAULT_SUBNETWORK, 0);
     }
 
     /**
@@ -387,14 +299,6 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         address vault
     ) public onlyOwner {
         _vaultWhitelist.pause(_now(), vault);
-        address operator = _vaultOperator.get(vault);
-        if (operator != address(0)) {
-            _operatorVaults[operator].pause(_now(), vault);
-        }
-
-        if (_sharedVaults.contains(vault)) {
-            _sharedVaults.pause(_now(), vault);
-        }
     }
 
     /**
@@ -405,36 +309,6 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
         address vault
     ) public onlyOwner {
         _vaultWhitelist.unpause(_now(), SLASHING_WINDOW, vault);
-        address operator = _vaultOperator.get(vault);
-        if (operator != address(0)) {
-            _operatorVaults[operator].unpause(_now(), SLASHING_WINDOW, vault);
-        }
-    }
-
-    /**
-     * @notice Registers a shared vault for the network.
-     * @param vault The address of the vault.
-     * @param networkLimit The network limit for the vault.
-     * @dev If the vault is not already whitelisted, it will be whitelisted, and the network
-     * limit will be set. The vault will then be registered as a shared vault.
-     */
-    function registerSharedVault(address vault, uint256 networkLimit) public onlyOwner {
-        // Whitelist if not already whitelisted
-        if (!_vaultWhitelist.contains(vault)) {
-            this.whitelistVault(vault, networkLimit);
-        }
-
-        _sharedVaults.register(_now(), vault);
-    }
-
-    /**
-     * @notice Deregisters a shared vault from the network.
-     * @param vault The address of the vault.
-     */
-    function deregisterSharedVault(
-        address vault
-    ) public onlyOwner {
-        _sharedVaults.unregister(_now(), SLASHING_WINDOW, vault);
     }
 
     /**
@@ -460,7 +334,7 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
             revert VaultNotInitialized();
         }
 
-        if (_vaultOperator.contains(vault) || _sharedVaults.contains(vault)) {
+        if (_vaultWhitelist.contains(vault)) {
             revert VaultAlreadyRegistered();
         }
 
