@@ -35,4 +35,10 @@ interface IOperatorsRegistryV1 {
     function deregisterOperator(
         address signer
     ) external;
+
+    /// @notice Update the rpc endpoint of an operator
+    /// @param signer The address of the operator
+    /// @param rpcEndpoint The new rpc endpoint
+    /// @dev Only restaking middleware contracts can call this function
+    function updateOperatorRpcEndpoint(address signer, string memory rpcEndpoint) external;
 }

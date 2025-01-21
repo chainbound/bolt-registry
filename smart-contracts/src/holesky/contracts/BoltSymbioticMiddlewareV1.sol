@@ -153,7 +153,7 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     // All external operator management is done through the bolt registry.
 
     /**
-     * @notice Register an operator in the registry
+     * @notice Register an operator in the registry.
      */
     function registerOperator(
         string calldata rpcEndpoint
@@ -170,13 +170,21 @@ contract BoltSymbioticMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @notice Deregister an operator from the registry
+     * @notice Deregister an operator from the registry.
      */
     function deregisterOperator() public {
         OPERATORS_REGISTRY.deregisterOperator(msg.sender);
 
         // TODO(V3): in the future we may not want to remove the vaults immediately, in case
         // of a pending penalty that the operator is trying to avoid.
+    }
+
+    /// @notice Update your RPC endpoint as an operator.
+    /// @param rpcEndpoint The new rpc endpoint.
+    function updateOperatorRpcEndpoint(
+        string calldata rpcEndpoint
+    ) public {
+        OPERATORS_REGISTRY.updateOperatorRpcEndpoint(msg.sender, rpcEndpoint);
     }
 
     // ================ OPERATOR VIEW METHODS =================== //
