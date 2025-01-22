@@ -41,7 +41,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
      *
      * Total storage slots: 50
      */
-    uint256[43] private __gap;
+    uint256[44] private __gap;
 
     // ========= Initializer & Proxy functionality ========= //
 
