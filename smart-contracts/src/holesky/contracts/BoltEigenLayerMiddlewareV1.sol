@@ -139,6 +139,14 @@ contract BoltEigenLayerMiddlewareV1 is
 
     // ========= AVS functions ========= //
 
+    /// @notice Update the RPC endpoint of the operator
+    /// @param rpcEndpoint The new RPC endpoint
+    function updateOperatorRpcEndpoint(
+        string calldata rpcEndpoint
+    ) public {
+        OPERATORS_REGISTRY.updateOperatorRpcEndpoint(msg.sender, rpcEndpoint);
+    }
+
     /// @notice Get the collaterals and amounts staked by an operator across the whitelisted strategies
     /// @param operator The operator address to get the collaterals and amounts staked for
     /// @return collaterals The collaterals staked by the operator
