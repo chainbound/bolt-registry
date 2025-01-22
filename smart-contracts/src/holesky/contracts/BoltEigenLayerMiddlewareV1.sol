@@ -174,7 +174,7 @@ contract BoltEigenLayerMiddlewareV1 is
         // the registration will be unsuccessful.
 
         // We forward the call to the OperatorsRegistry to register the operator in its storage.
-        OPERATORS_REGISTRY.registerOperator(operator, string(data));
+        OPERATORS_REGISTRY.registerOperator(operator, string(data), "");
     }
 
     /// @notice Allows the AllocationManager to hook into the middleware to validate operator deregistration

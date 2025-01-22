@@ -6,11 +6,19 @@ import {IBoltRestakingMiddlewareV1} from "./IBoltRestakingMiddlewareV1.sol";
 /// @title IOperatorsRegistryV1
 /// @notice An interface for the OperatorsRegistryV1 contract
 interface IOperatorsRegistryV1 {
+    /// @notice Operator struct
+    struct Operator {
+        address signer;
+        string rpcEndpoint;
+        address restakingMiddleware;
+        string extraData;
+    }
+
     /// @notice Emitted when a new operator is registered
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator
     /// @param restakingMiddleware The address of the restaking middleware
-    event OperatorRegistered(address signer, string rpcEndpoint, address restakingMiddleware);
+    event OperatorRegistered(address signer, string rpcEndpoint, address restakingMiddleware, string extraData);
 
     /// @notice Emitted when an operator is deregistered
     /// @param signer The address of the operator
@@ -68,6 +76,28 @@ interface IOperatorsRegistryV1 {
     function unpauseOperator(
         address signer
     ) external;
+
+    /// @notice Returns all the operators saved in the registry, including inactive ones.
+    /// @return operators The array of operators
+    function getAllOperators() external view returns (Operator[] memory);
+
+    /// @notice Returns the active operators in the registry.
+    /// @return operators The array of active operators.
+    function getActiveOperators() external view returns (Operator[] memory);
+
+    /// @notice Returns true if the given address is an operator in the registry.
+    /// @param signer The address of the operator.
+    /// @return isOperator True if the address is an operator, false otherwise.
+    function isOperator(
+        address signer
+    ) external view returns (bool);
+
+    /// @notice Returns true if the given operator is registered AND active.
+    /// @param signer The address of the operator
+    /// @return isActiveOperator True if the operator is active, false otherwise.
+    function isActiveOperator(
+        address signer
+    ) external view returns (bool);
 
     /// @notice Returns the timestamp of when the current epoch started
     function getCurrentEpochStartTimestamp() external view returns (uint48);

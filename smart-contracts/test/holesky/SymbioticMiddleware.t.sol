@@ -141,7 +141,9 @@ contract SymbioticMiddlewareTest is Test {
 
         // Bolt registration
         vm.expectEmit();
-        emit IOperatorsRegistryV1.OperatorRegistered(operator, "https://rpc.boltprotocol.xyz", address(middleware));
+        emit IOperatorsRegistryV1.OperatorRegistered(
+            operator, "https://rpc.boltprotocol.xyz", address(middleware), "BOLT"
+        );
 
         middleware.registerOperator("https://rpc.boltprotocol.xyz", "BOLT");
 

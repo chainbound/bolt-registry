@@ -5,14 +5,15 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 
+import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
+
 import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
 import {IBoltRestakingMiddlewareV1} from "../interfaces/IBoltRestakingMiddlewareV1.sol";
-import {OperatorsLibV1} from "../lib/OperatorsLibV1.sol";
 
 /// @title OperatorsRegistryV1
 /// @notice A smart contract to store and manage Bolt operators
-contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsRegistryV1 {
-    using OperatorsLibV1 for OperatorsLibV1.OperatorMap;
+contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUpgradeable {
+    using PauseableEnumerableSet for PauseableEnumerableSet.AddressSet;
 
     /// @notice The start timestamp of the contract, used as reference for time-based operations
     uint48 public START_TIMESTAMP;
@@ -20,8 +21,11 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @notice The duration of an epoch in seconds, used for delaying opt-in/out operations
     uint48 public EPOCH_DURATION;
 
-    /// @notice The set of bolt operators, indexed by their signer address
-    OperatorsLibV1.OperatorMap private OPERATORS;
+    /// @notice The set of bolt operator addresses.
+    PauseableEnumerableSet.AddressSet private _operatorAddresses;
+
+    /// @notice The map of operators with their signer address as the key
+    mapping(address => Operator) public operators;
 
     /// @notice the address of the EigenLayer restaking middleware
     IBoltRestakingMiddlewareV1 public EIGENLAYER_RESTAKING_MIDDLEWARE;
@@ -95,8 +99,13 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
         string memory rpcEndpoint,
         string memory extraData
     ) external onlyMiddleware {
-        OPERATORS.add(signer, rpcEndpoint, msg.sender, extraData);
-        emit OperatorRegistered(signer, rpcEndpoint, msg.sender);
+        // TODO: Checks
+
+        // TODO: should the enable timestamp here be the epoch instead?
+        _operatorAddresses.register(Time.timestamp(), signer);
+        operators[signer] = Operator(signer, rpcEndpoint, msg.sender, extraData);
+
+        emit OperatorRegistered(signer, rpcEndpoint, msg.sender, extraData);
     }
 
     /// @notice Pause an operator in the registry
@@ -106,18 +115,18 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     function pauseOperator(
         address signer
     ) external onlyMiddleware {
-        OPERATORS.pause(signer);
+        _operatorAddresses.pause(EPOCH_DURATION, signer);
         emit OperatorPaused(signer, msg.sender);
     }
 
     /// @notice Unpause an operator in the registry, marking them as "active"
     /// @param signer The address of the operator
     /// @dev Only restaking middleware contracts can call this function
-    /// @dev Operators need to be paused and wait for IMMUTABLE_PERIOD() before they can be deregistered.
+    /// @dev Operators need to be paused and wait for EPOCH_DURATION() before they can be deregistered.
     function unpauseOperator(
         address signer
     ) external onlyMiddleware {
-        OPERATORS.unpause(signer);
+        _operatorAddresses.unpause(Time.timestamp(), EPOCH_DURATION, signer);
         emit OperatorUnpaused(signer, msg.sender);
     }
 
@@ -126,7 +135,9 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @param newRpcEndpoint The new rpc endpoint
     /// @dev Only restaking middleware contracts can call this function
     function updateOperatorRpcEndpoint(address signer, string memory newRpcEndpoint) external onlyMiddleware {
-        OPERATORS.updateRpcEndpoint(signer, newRpcEndpoint);
+        if (_operatorAddresses.contains(signer)) {
+            operators[signer].rpcEndpoint = newRpcEndpoint;
+        }
     }
 
     /// @notice Deregister an operator from the registry
@@ -136,16 +147,36 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     function deregisterOperator(
         address signer
     ) external onlyMiddleware {
-        require(OPERATORS.contains(signer), "Operator does not exist");
+        _operatorAddresses.unregister(Time.timestamp(), EPOCH_DURATION, signer);
+        delete operators[signer];
 
-        OPERATORS.remove(signer);
         emit OperatorDeregistered(signer, msg.sender);
     }
 
-    /// @notice Returns all the operators saved in the registry
+    /// @notice Returns all the operators saved in the registry, including inactive ones.
     /// @return operators The array of operators
-    function getAllOperators() public view returns (OperatorsLibV1.Operator[] memory operators) {
-        return OPERATORS.getAll();
+    function getAllOperators() public view returns (Operator[] memory) {
+        Operator[] memory ops = new Operator[](_operatorAddresses.length());
+
+        for (uint256 i = 0; i < _operatorAddresses.length(); i++) {
+            (address signer,,) = _operatorAddresses.at(i);
+            ops[i] = operators[signer];
+        }
+
+        return ops;
+    }
+
+    /// @notice Returns the active operators in the registry.
+    /// @return operators The array of active operators.
+    function getActiveOperators() public view returns (Operator[] memory) {
+        address[] memory addrs = _operatorAddresses.getActive(Time.timestamp());
+
+        Operator[] memory ops = new Operator[](addrs.length);
+        for (uint256 i = 0; i < addrs.length; i++) {
+            ops[i] = operators[addrs[i]];
+        }
+
+        return ops;
     }
 
     /// @notice Returns the operator with the given signer address, and whether the operator is active
@@ -154,17 +185,32 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @dev Reverts if the operator does not exist
     function getOperator(
         address signer
-    ) public view returns (OperatorsLibV1.Operator memory operator, bool isActive) {
-        return OPERATORS.get(signer);
+    ) public view returns (Operator memory operator, bool isActive) {
+        if (!_operatorAddresses.contains(signer)) {
+            revert("Operator does not exist");
+        }
+
+        operator = operators[signer];
+
+        return (operator, _operatorAddresses.wasActiveAt(Time.timestamp(), signer));
     }
 
-    /// @notice Returns true if the given address is an operator in the registry
-    /// @param signer The address of the operator
-    /// @return isOperator True if the address is an operator, false otherwise
+    /// @notice Returns true if the given address is an operator in the registry.
+    /// @param signer The address of the operator.
+    /// @return isOperator True if the address is an operator, false otherwise.
     function isOperator(
         address signer
     ) public view returns (bool) {
-        return OPERATORS.contains(signer);
+        return _operatorAddresses.contains(signer);
+    }
+
+    /// @notice Returns true if the given operator is registered AND active.
+    /// @param signer The address of the operator
+    /// @return isActiveOperator True if the operator is active, false otherwise.
+    function isActiveOperator(
+        address signer
+    ) public view returns (bool) {
+        return _operatorAddresses.wasActiveAt(Time.timestamp(), signer);
     }
 
     // ========= Restaking Middlewres ========= //

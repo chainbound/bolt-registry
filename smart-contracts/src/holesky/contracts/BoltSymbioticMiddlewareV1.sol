@@ -160,7 +160,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
             revert OperatorNotOptedIn();
         }
 
-        OPERATORS_REGISTRY.registerOperator(msg.sender, rpcEndpoint);
+        OPERATORS_REGISTRY.registerOperator(msg.sender, rpcEndpoint, extraData);
     }
 
     /**
