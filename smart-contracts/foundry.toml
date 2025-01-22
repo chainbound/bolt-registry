@@ -1,4 +1,5 @@
 [profile.default]
+evm_version = "cancun"
 solc = "0.8.27"
 via_ir = true
 src = "src"
