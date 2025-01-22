@@ -46,6 +46,9 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     // ===================== ERRORS ======================== //
     error MissingOperatorRpc();
     error InvalidSigner();
+    error Unauthorized();
+    error UnknownOperator();
+    error InvalidMiddleware(string reason);
 
     // ========= Initializer & Proxy functionality ========= //
 
@@ -71,7 +74,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         require(
             msg.sender == address(EIGENLAYER_RESTAKING_MIDDLEWARE)
                 || msg.sender == address(SYMBIOTIC_RESTAKING_MIDDLEWARE),
-            "Only restaking middlewares can call this function"
+            Unauthorized()
         );
         _;
     }
@@ -103,13 +106,8 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         string memory rpcEndpoint,
         string memory extraData
     ) external onlyMiddleware {
-        if (bytes(rpcEndpoint).length == 0) {
-            revert MissingOperatorRpc();
-        }
-
-        if (signer == address(0)) {
-            revert InvalidSigner();
-        }
+        require(bytes(rpcEndpoint).length > 0, MissingOperatorRpc());
+        require(signer != address(0), InvalidSigner());
 
         _operatorAddresses.register(Time.timestamp(), signer);
         operators[signer] = Operator(signer, rpcEndpoint, msg.sender, extraData);
@@ -144,9 +142,9 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     /// @param newRpcEndpoint The new rpc endpoint
     /// @dev Only restaking middleware contracts can call this function
     function updateOperatorRpcEndpoint(address signer, string memory newRpcEndpoint) external onlyMiddleware {
-        if (_operatorAddresses.contains(signer)) {
-            operators[signer].rpcEndpoint = newRpcEndpoint;
-        }
+        require(_operatorAddresses.contains(signer), UnknownOperator());
+
+        operators[signer].rpcEndpoint = newRpcEndpoint;
     }
 
     /// @notice Deregister an operator from the registry
@@ -195,9 +193,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     function getOperator(
         address signer
     ) public view returns (Operator memory operator, bool isActive) {
-        if (!_operatorAddresses.contains(signer)) {
-            revert("Operator does not exist");
-        }
+        require(_operatorAddresses.contains(signer), UnknownOperator());
 
         operator = operators[signer];
 
@@ -244,7 +240,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         string calldata restakingProtocol,
         IBoltRestakingMiddlewareV1 newMiddleware
     ) public onlyOwner {
-        require(address(newMiddleware) != address(0), "Invalid middleware address");
+        require(address(newMiddleware) != address(0), InvalidMiddleware("Middleware address cannot be 0"));
 
         bytes32 protocolNameHash = keccak256(abi.encodePacked(restakingProtocol));
 
@@ -253,7 +249,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         } else if (protocolNameHash == keccak256("SYMBIOTIC")) {
             SYMBIOTIC_RESTAKING_MIDDLEWARE = newMiddleware;
         } else {
-            revert("Invalid restaking protocol name. Valid values are: 'EIGENLAYER', 'SYMBIOTIC'");
+            revert InvalidMiddleware("Unknown restaking protocol, want EIGENLAYER or SYMBIOTIC");
         }
     }
 }

@@ -152,13 +152,9 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
      * @notice Register an operator in the registry.
      */
     function registerOperator(string calldata rpcEndpoint, string calldata extraData) public {
-        if (!IRegistry(OPERATOR_REGISTRY).isEntity(msg.sender)) {
-            revert NotOperator();
-        }
+        require(IRegistry(OPERATOR_REGISTRY).isEntity(msg.sender), NotOperator());
 
-        if (!IOptInService(OPERATOR_NET_OPTIN).isOptedIn(msg.sender, NETWORK)) {
-            revert OperatorNotOptedIn();
-        }
+        require(IOptInService(OPERATOR_NET_OPTIN).isOptedIn(msg.sender, NETWORK), OperatorNotOptedIn());
 
         OPERATORS_REGISTRY.registerOperator(msg.sender, rpcEndpoint, extraData);
     }
@@ -334,13 +330,9 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
     function _validateVault(
         address vault
     ) private view {
-        if (!IRegistry(VAULT_REGISTRY).isEntity(vault)) {
-            revert NotVault();
-        }
+        require(IRegistry(VAULT_REGISTRY).isEntity(vault), NotVault());
 
-        if (!IVault(vault).isInitialized()) {
-            revert VaultNotInitialized();
-        }
+        require(IVault(vault).isInitialized(), VaultNotInitialized());
 
         if (_vaultWhitelist.contains(vault)) {
             revert VaultAlreadyRegistered();
