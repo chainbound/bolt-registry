@@ -223,8 +223,9 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
             }
         }
 
+        // If vault is not found (inactive or not whitelisted), return 0
         if (vault == address(0)) {
-            revert UnauthorizedVault();
+            return 0;
         }
 
         bytes32 networkId = NETWORK.subnetwork(DEFAULT_SUBNETWORK);

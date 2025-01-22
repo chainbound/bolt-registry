@@ -74,6 +74,65 @@ contract SymbioticMiddlewareTest is Test {
         vm.stopPrank();
     }
 
+    function _prepareNetworkAndVault() public {
+        // --- Whitelist vault, activate network on vault ---
+        vm.prank(admin);
+        // Whitelist the vault
+        middleware.whitelistVault(address(wstEthVault));
+        // Activate the vault by setting max network limit
+        vm.startPrank(network);
+        IBaseDelegator(wstEthVault.delegator()).setMaxNetworkLimit(0, 10 ether);
+        vm.stopPrank();
+
+        // --- Set network limit for network as curator ---
+        vm.startPrank(vaultAdmin);
+        INetworkRestakeDelegator(wstEthVault.delegator()).setNetworkLimit(network.subnetwork(0), 10 ether);
+
+        assertEq(middleware.getOperatorStake(operator, address(wstEth)), 0);
+
+        // Mint operator shares (need to be vault admin / curator)
+        INetworkRestakeDelegator(wstEthVault.delegator()).setOperatorNetworkShares(
+            network.subnetwork(0), operator, 1 ether
+        );
+
+        assertEq(
+            INetworkRestakeDelegator(wstEthVault.delegator()).operatorNetworkShares(network.subnetwork(0), operator),
+            1 ether
+        );
+
+        assertEq(
+            INetworkRestakeDelegator(wstEthVault.delegator()).totalOperatorNetworkShares(network.subnetwork(0)), 1 ether
+        );
+
+        vm.stopPrank();
+    }
+
+    // This function does the following:
+    // - Register the operator in Symbiotic contracts
+    // - Opt in to the Bolt network
+    // - Deposit collateral in the vault linked to the Bolt network
+    function _registerOperatorRoutine() public {
+        vm.startPrank(operator);
+
+        IOperatorRegistry(operatorRegistry).registerOperator();
+        IOptInService(operatorNetOptin).optIn(network);
+
+        IOptInService(vaultOptinService).optIn(address(wstEthVault));
+
+        // --- Add stake to the Vault ---
+        deal(address(wstEth), operator, 1 ether);
+
+        wstEth.approve(address(wstEthVault), 1 ether);
+
+        // deposit collateral from "provider" on behalf of "operator"
+        (uint256 depositedAmount, uint256 mintedShares) = wstEthVault.deposit(operator, 1 ether);
+
+        assertEq(depositedAmount, 1 ether);
+        assertEq(mintedShares, 1 ether);
+
+        vm.stopPrank();
+    }
+
     function testRegisterOperator() public {
         vm.startPrank(operator);
         // Symbiotic registration
@@ -119,53 +178,8 @@ contract SymbioticMiddlewareTest is Test {
     }
 
     function testDeposit() public {
-        vm.prank(admin);
-        middleware.whitelistVault(address(wstEthVault));
-
-        vm.startPrank(network);
-        // Set the max network limit for the vault as the network
-        IBaseDelegator(wstEthVault.delegator()).setMaxNetworkLimit(0, 10 ether);
-        vm.stopPrank();
-
-        // Set the network limit for this network (as the curator)
-        vm.startPrank(vaultAdmin);
-        INetworkRestakeDelegator(wstEthVault.delegator()).setNetworkLimit(network.subnetwork(0), 10 ether);
-
-        assertEq(middleware.getOperatorStake(operator, address(wstEth)), 0);
-
-        // Mint operator shares (need to be vault admin / curator)
-        INetworkRestakeDelegator(wstEthVault.delegator()).setOperatorNetworkShares(
-            network.subnetwork(0), operator, 1 ether
-        );
-        vm.stopPrank();
-
-        assertEq(
-            INetworkRestakeDelegator(wstEthVault.delegator()).operatorNetworkShares(network.subnetwork(0), operator),
-            1 ether
-        );
-
-        assertEq(
-            INetworkRestakeDelegator(wstEthVault.delegator()).totalOperatorNetworkShares(network.subnetwork(0)), 1 ether
-        );
-
-        // --- Register the operator ---
-        vm.startPrank(operator);
-
-        IOperatorRegistry(operatorRegistry).registerOperator();
-        IOptInService(operatorNetOptin).optIn(network);
-
-        IOptInService(vaultOptinService).optIn(address(wstEthVault));
-
-        // --- Add stake to the Vault ---
-        deal(address(wstEth), operator, 1 ether);
-
-        wstEth.approve(address(wstEthVault), 1 ether);
-
-        // deposit collateral from "provider" on behalf of "operator"
-        (uint256 depositedAmount, uint256 mintedShares) = wstEthVault.deposit(operator, 1 ether);
-
-        assertEq(depositedAmount, 1 ether);
-        assertEq(mintedShares, 1 ether);
+        _prepareNetworkAndVault();
+        _registerOperatorRoutine();
 
         assert(wstEth.balanceOf(address(wstEthVault)) >= 1 ether);
 
@@ -176,5 +190,39 @@ contract SymbioticMiddlewareTest is Test {
         // stake = operatorShares * min(activeStake, networkLimit) / totalShares
         uint256 activeStake = wstEthVault.activeStake();
         assertEq(middleware.getOperatorStake(operator, address(wstEth)), activeStake);
+    }
+
+    // This function tests whether pausing a vault actually deactivates the collateral
+    function testDeactivateCollateral() public {
+        _prepareNetworkAndVault();
+        _registerOperatorRoutine();
+
+        // All stake is active for this operator, because operatorShares == totalShares
+        // stake = operatorShares * min(activeStake, networkLimit) / totalShares
+        uint256 activeStake = wstEthVault.activeStake();
+        assertEq(middleware.getOperatorStake(operator, address(wstEth)), activeStake);
+
+        // Pause the vault
+        vm.prank(admin);
+        middleware.pauseVault(address(wstEthVault));
+        assertEq(middleware.getOperatorStake(operator, address(wstEth)), 0);
+    }
+
+    function testGetCollaterals() public {
+        _prepareNetworkAndVault();
+        _registerOperatorRoutine();
+
+        // Only 1 whitelisted collateral -> array len will be 1
+        (address[] memory collaterals, uint256[] memory amounts) = middleware.getOperatorCollaterals(operator);
+
+        assertEq(collaterals.length, 1);
+        assert(amounts[0] >= 1 ether);
+
+        vm.prank(admin);
+        middleware.pauseVault(address(wstEthVault));
+
+        (collaterals, amounts) = middleware.getOperatorCollaterals(operator);
+        assertEq(collaterals.length, 1);
+        assert(amounts[0] == 0);
     }
 }
