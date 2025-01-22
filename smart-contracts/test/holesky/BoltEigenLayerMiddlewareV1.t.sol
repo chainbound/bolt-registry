@@ -13,6 +13,7 @@ import {IStrategy} from "@eigenlayer/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "@eigenlayer/src/contracts/interfaces/ISignatureUtils.sol";
 import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.sol";
 import {OperatorSet} from "@eigenlayer/src/contracts/libraries/OperatorSetLib.sol";
+import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
 import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
 import {IOperatorsRegistryV1} from "../../src/holesky/interfaces/IOperatorsRegistryV1.sol";
@@ -24,8 +25,9 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
     BoltEigenLayerMiddlewareV1 middleware;
 
     address admin;
-    address operator;
     address staker;
+    address operator;
+    uint256 operatorSk;
 
     IAllocationManager holeskyAllocationManager = IAllocationManager(0x78469728304326CBc65f8f95FA756B0B73164462);
     IDelegationManager holeskyDelegationManager = IDelegationManager(0xA44151489861Fe9e3055d95adC98FbD462B948e7);
@@ -38,6 +40,9 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
     IERC20 holeskyWeth = IERC20(0x94373a4919B3240D86eA41593D5eBa789FEF3848);
     IStrategy holeskyWethStrategy = IStrategy(0x80528D6e9A2BAbFc766965E0E26d5aB08D9CFaF9);
 
+    IERC20 holeskycbEth = IERC20(0x8720095Fa5739Ab051799211B146a2EEE4Dd8B37);
+    IStrategy holeskyCbEthStrategy = IStrategy(0x70EB4D3c164a6B4A5f908D4FBb5a9cAfFb66bAB6);
+
     // Note: operators can gate staker delegations behind a signature check. when this is disabled,
     // a signature is still required but it can be empty. This is a no-op signature.
     ISignatureUtils.SignatureWithExpiry NoOpSignature = ISignatureUtils.SignatureWithExpiry(bytes(""), 0);
@@ -46,8 +51,8 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         vm.createSelectFork("https://geth-holesky.bolt.chainbound.io");
 
         admin = makeAddr("admin");
-        operator = makeAddr("operator");
         staker = makeAddr("staker");
+        (operator, operatorSk) = makeAddrAndKey("operator");
 
         vm.startPrank(admin);
 
@@ -184,5 +189,96 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         // weth should have 100e18 balance
         assertEq(collaterals[1], address(holeskyWeth));
         assertEq(amounts[1], 100 ether);
+    }
+
+    function testCannotAddAlreadyWhitelistedStrategy() public {
+        vm.prank(admin);
+        vm.expectRevert(BoltEigenLayerMiddlewareV1.StrategyAlreadyWhitelisted.selector);
+        middleware.addStrategyToWhitelist(address(holeskyStEthStrategy));
+    }
+
+    function testCannotAddInvalidStrategyAddress() public {
+        vm.prank(admin);
+        vm.expectRevert(BoltEigenLayerMiddlewareV1.InvalidStrategyAddress.selector);
+        middleware.addStrategyToWhitelist(address(0));
+    }
+
+    function testCannotAddOperatorSetWithNonWhitelistedStrategy() public {
+        IStrategy[] memory strategies = new IStrategy[](1);
+        strategies[0] = IStrategy(address(holeskyCbEthStrategy));
+
+        IAllocationManagerTypes.CreateSetParams[] memory createParams = new IAllocationManagerTypes.CreateSetParams[](1);
+        createParams[0] = IAllocationManagerTypes.CreateSetParams({operatorSetId: 1, strategies: strategies});
+
+        vm.prank(admin);
+        vm.expectRevert(BoltEigenLayerMiddlewareV1.StrategyNotWhitelisted.selector);
+        middleware.createOperatorSets(createParams);
+    }
+
+    function testCannotRemoveNonWhitelistedStrategy() public {
+        vm.prank(admin);
+        vm.expectRevert(BoltEigenLayerMiddlewareV1.StrategyNotWhitelisted.selector);
+        middleware.removeStrategyFromWhitelist(address(holeskyCbEthStrategy));
+    }
+
+    function testCannotRemoveUnpausedStrategy() public {
+        vm.prank(admin);
+        vm.expectRevert(PauseableEnumerableSet.Enabled.selector);
+        middleware.removeStrategyFromWhitelist(address(holeskyStEthStrategy));
+    }
+
+    function testMustWaitImmutablePeriodBeforeRemovingStrategy() public {
+        vm.prank(admin);
+        middleware.pauseStrategy(address(holeskyStEthStrategy));
+
+        vm.prank(admin);
+        vm.expectRevert(PauseableEnumerableSet.ImmutablePeriodNotPassed.selector);
+        middleware.removeStrategyFromWhitelist(address(holeskyStEthStrategy));
+
+        vm.warp(block.timestamp + 1 days + 1);
+        vm.prank(admin);
+        middleware.removeStrategyFromWhitelist(address(holeskyStEthStrategy));
+    }
+
+    function testCannotUseAllocationManagerIfNotSet() public {
+        vm.prank(admin);
+        middleware.updateAllocationManagerAddress(address(0));
+
+        // When the AllocationManager is set to 0x0, the only way to opt-in
+        // is through the middeware.registerThroughAVSDirectory() method.
+
+        uint32 allocationDelay = 1;
+        address delegationApprover = address(0x0); // this is optional, skip it
+        string memory uri = "some-meetadata.uri.com";
+        vm.prank(operator);
+        holeskyDelegationManager.registerAsOperator(delegationApprover, allocationDelay, uri);
+
+        vm.prank(operator);
+        vm.expectRevert(BoltEigenLayerMiddlewareV1.NotAllocationManager.selector);
+        holeskyAllocationManager.registerForOperatorSets(
+            operator,
+            IAllocationManagerTypes.RegisterParams({
+                avs: address(middleware),
+                operatorSetIds: new uint32[](0),
+                data: abi.encode("")
+            })
+        );
+    }
+
+    function testCannotRegisterThroughAVSDirectoryIfNotOperator() public {
+        bytes32 operatorRegistrationDigestHash = holeskyAVSDirectory.calculateOperatorAVSRegistrationDigestHash({
+            operator: operator,
+            avs: address(middleware),
+            salt: bytes32(0),
+            expiry: UINT256_MAX
+        });
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(operatorSk, operatorRegistrationDigestHash);
+        bytes memory operatorRawSignature = abi.encodePacked(r, s, v);
+        ISignatureUtils.SignatureWithSaltAndExpiry memory operatorSignature =
+            ISignatureUtils.SignatureWithSaltAndExpiry(operatorRawSignature, bytes32(0), UINT256_MAX);
+
+        vm.prank(operator);
+        vm.expectRevert(BoltEigenLayerMiddlewareV1.NotOperator.selector);
+        middleware.registerThroughAVSDirectory("http://stopjava.com", "operator1", operatorSignature);
     }
 }

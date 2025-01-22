@@ -170,7 +170,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         mainnetCbEth.approve(address(mainnetStrategyManager), 100 ether);
         vm.prank(staker);
         uint256 shares = mainnetStrategyManager.depositIntoStrategy(mainnetCbEthStrategy, mainnetCbEth, 100 ether);
-        assertEq(mainnetCbEthStrategy.sharesToUnderlyingView(shares), 99999999999999999999);
+        assertEq(mainnetCbEthStrategy.sharesToUnderlyingView(shares), 99_999_999_999_999_999_999);
 
         // 2. Register the operator in both EL and the bolt AVS
         _registerOperator(operator, "http://stopjava.com", "operator1");
@@ -190,6 +190,6 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         assertEq(collaterals.length, 1);
         assertEq(amounts.length, 1);
         assertEq(collaterals[0], address(mainnetCbEth));
-        assertEq(amounts[0], 99999999999999999999);
+        assertEq(amounts[0], 99_999_999_999_999_999_999);
     }
 }
