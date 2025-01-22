@@ -67,9 +67,7 @@ contract SymbioticMiddlewareTest is Test {
 
         INetworkMiddlewareService(networkMiddlewareService).setMiddleware(address(middleware));
 
-        middleware.initialize(
-            admin, network, address(registry), 0, 0, vaultRegistry, operatorRegistry, operatorNetOptin
-        );
+        middleware.initialize(admin, network, address(registry), vaultRegistry, operatorRegistry, operatorNetOptin);
 
         vm.stopPrank();
     }
