@@ -151,9 +151,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
     /**
      * @notice Register an operator in the registry.
      */
-    function registerOperator(
-        string calldata rpcEndpoint
-    ) public {
+    function registerOperator(string calldata rpcEndpoint, string calldata extraData) public {
         if (!IRegistry(OPERATOR_REGISTRY).isEntity(msg.sender)) {
             revert NotOperator();
         }
@@ -316,6 +314,16 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
      */
     function vaultWhitelistLength() public view returns (uint256) {
         return _vaultWhitelist.length();
+    }
+
+    /**
+     * @notice Returns whether the vault is currently active.
+     * @param vault The address of the vault
+     */
+    function isVaultActive(
+        address vault
+    ) public view returns (bool) {
+        return _vaultWhitelist.wasActiveAt(_now(), vault);
     }
 
     /**

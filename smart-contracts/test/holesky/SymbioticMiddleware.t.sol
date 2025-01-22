@@ -23,6 +23,8 @@ import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 contract SymbioticMiddlewareTest is Test {
     using Subnetwork for address;
 
+    uint48 EPOCH_DURATION = 1 days;
+
     OperatorsRegistryV1 registry;
     BoltSymbioticMiddlewareV1 middleware;
 
@@ -51,7 +53,7 @@ contract SymbioticMiddlewareTest is Test {
         vm.startPrank(admin);
 
         registry = new OperatorsRegistryV1();
-        registry.initialize(admin, 1 days);
+        registry.initialize(admin, EPOCH_DURATION);
 
         middleware = new BoltSymbioticMiddlewareV1();
         // Set the restaking middleware
@@ -82,7 +84,7 @@ contract SymbioticMiddlewareTest is Test {
         vm.expectEmit();
         emit IOperatorsRegistryV1.OperatorRegistered(operator, "https://rpc.boltprotocol.xyz", address(middleware));
 
-        middleware.registerOperator("https://rpc.boltprotocol.xyz");
+        middleware.registerOperator("https://rpc.boltprotocol.xyz", "BOLT");
 
         vm.stopPrank();
     }
@@ -101,10 +103,24 @@ contract SymbioticMiddlewareTest is Test {
         vm.stopPrank();
     }
 
-    function testDeposit() public {
+    function testDeregisterVault() public {
         vm.startPrank(admin);
+
         middleware.whitelistVault(address(wstEthVault));
-        vm.stopPrank();
+        assertEq(middleware.vaultWhitelistLength(), 1);
+
+        middleware.pauseVault(address(wstEthVault));
+        // Fast-forward for epoch duration, to pass the immutable period
+        vm.warp(block.timestamp + EPOCH_DURATION);
+        assertEq(middleware.isVaultActive(address(wstEthVault)), false);
+
+        middleware.removeVault(address(wstEthVault));
+        assertEq(middleware.vaultWhitelistLength(), 0);
+    }
+
+    function testDeposit() public {
+        vm.prank(admin);
+        middleware.whitelistVault(address(wstEthVault));
 
         vm.startPrank(network);
         // Set the max network limit for the vault as the network
@@ -132,6 +148,7 @@ contract SymbioticMiddlewareTest is Test {
             INetworkRestakeDelegator(wstEthVault.delegator()).totalOperatorNetworkShares(network.subnetwork(0)), 1 ether
         );
 
+        // --- Register the operator ---
         vm.startPrank(operator);
 
         IOperatorRegistry(operatorRegistry).registerOperator();
