@@ -79,7 +79,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
      *
      * Total storage slots: 50
      */
-    uint256[43] private __gap;
+    uint256[42] private __gap;
 
     /// @notice The vault delegator types.
     /// @dev <https://docs.symbiotic.fi/modules/vault/introduction#3-limits-and-delegation-logic-module>
@@ -115,7 +115,6 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
      * @notice Constructor for initializing the SymbioticMiddlewareV1 contract
      * @param owner The address of the owner
      * @param network The address of the network
-     * @param slashingWindow The duration of the slashing window (unused in V1)
      * @param vaultRegistry The address of the vault registry
      * @param operatorRegistry The address of the operator registry
      * @param operatorNetOptin The address of the operator network opt-in service
@@ -126,8 +125,6 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         address owner,
         address network,
         address boltOperatorsRegistry,
-        uint48 epochDuration,
-        uint48 slashingWindow,
         address vaultRegistry,
         address operatorRegistry,
         address operatorNetOptin
@@ -136,12 +133,9 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
 
         NETWORK = network;
         OPERATORS_REGISTRY = IOperatorsRegistryV1(boltOperatorsRegistry);
-        SLASHING_WINDOW = slashingWindow;
-        EPOCH_DURATION = epochDuration;
         VAULT_REGISTRY = vaultRegistry;
         OPERATOR_REGISTRY = operatorRegistry;
         OPERATOR_NET_OPTIN = operatorNetOptin;
-        START_TIMESTAMP = _now();
         NAME_HASH = keccak256("SYMBIOTIC");
     }
 
@@ -291,7 +285,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
     function removeVault(
         address vault
     ) public onlyOwner {
-        _vaultWhitelist.unregister(_now(), SLASHING_WINDOW, vault);
+        _vaultWhitelist.unregister(_now(), OPERATORS_REGISTRY.EPOCH_DURATION(), vault);
         emit VaultRemoved(vault);
     }
 
@@ -313,7 +307,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
     function unpauseVault(
         address vault
     ) public onlyOwner {
-        _vaultWhitelist.unpause(_now(), SLASHING_WINDOW, vault);
+        _vaultWhitelist.unpause(_now(), OPERATORS_REGISTRY.EPOCH_DURATION(), vault);
         emit VaultUnpaused(vault);
     }
 
