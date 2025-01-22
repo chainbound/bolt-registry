@@ -44,11 +44,28 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     uint256[44] private __gap;
 
     // ===================== ERRORS ======================== //
-    error MissingOperatorRpc();
+    error InvalidRpc();
     error InvalidSigner();
     error Unauthorized();
     error UnknownOperator();
     error InvalidMiddleware(string reason);
+
+    // ========= Errors ========= //
+
+    /// @notice Error thrown when a non-middleware contract calls a middleware function
+    error OnlyRestakingMiddlewares();
+
+    /// @notice Error thrown when an invalid restaking protocol name is provided
+    error InvalidRestakingProtocolName(string restakingProtocol);
+
+    /// @notice Error thrown when an invalid rpc endpoint is provided
+    error InvalidRpcEndpoint();
+
+    /// @notice Error thrown when an operator does not exist
+    error OperatorDoesNotExist();
+
+    /// @notice Error thrown when an invalid middleware address is provided
+    error InvalidMiddlewareAddress();
 
     // ========= Initializer & Proxy functionality ========= //
 
@@ -74,7 +91,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         require(
             msg.sender == address(EIGENLAYER_RESTAKING_MIDDLEWARE)
                 || msg.sender == address(SYMBIOTIC_RESTAKING_MIDDLEWARE),
-            Unauthorized()
+            OnlyRestakingMiddlewares()
         );
         _;
     }
@@ -106,7 +123,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         string memory rpcEndpoint,
         string memory extraData
     ) external onlyMiddleware {
-        require(bytes(rpcEndpoint).length > 0, MissingOperatorRpc());
+        require(bytes(rpcEndpoint).length > 0, InvalidRpc());
         require(signer != address(0), InvalidSigner());
 
         _operatorAddresses.register(Time.timestamp(), signer);
@@ -154,6 +171,8 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     function deregisterOperator(
         address signer
     ) external onlyMiddleware {
+        require(_operatorAddresses.contains(signer), UnknownOperator());
+
         _operatorAddresses.unregister(Time.timestamp(), EPOCH_DURATION, signer);
         delete operators[signer];
 

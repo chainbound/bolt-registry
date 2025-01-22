@@ -229,7 +229,7 @@ contract BoltEigenLayerMiddlewareV1 is
         return _getActiveStrategiesAt(timestamp);
     }
 
-    // ========= [pre-slashing] AVS Registration functions ========= //
+    // ========= [pre-slashing only] AVS Registration functions ========= //
 
     /// @notice Register an operator through the AVS Directory
     /// @param rpcEndpoint The RPC URL of the operator
@@ -374,6 +374,46 @@ contract BoltEigenLayerMiddlewareV1 is
         } else if (contractNameHash == keccak256("AVS_DIRECTORY")) {
             AVS_DIRECTORY.updateAVSMetadataURI(metadataURI);
         }
+    }
+
+    /// @notice Update the AllocationManager address
+    /// @param newAllocationManager The new AllocationManager address
+    function updateAllocationManagerAddress(
+        address newAllocationManager
+    ) public onlyOwner {
+        ALLOCATION_MANAGER = IAllocationManager(newAllocationManager);
+    }
+
+    /// @notice Update the AVSDirectory address
+    /// @param newAVSDirectory The new AVSDirectory address
+    function updateAVSDirectoryAddress(
+        address newAVSDirectory
+    ) public onlyOwner {
+        AVS_DIRECTORY = IAVSDirectory(newAVSDirectory);
+    }
+
+    /// @notice Update the StrategyManager address
+    /// @param newStrategyManager The new StrategyManager address
+    function updateStrategyManagerAddress(
+        address newStrategyManager
+    ) public onlyOwner {
+        STRATEGY_MANAGER = IStrategyManager(newStrategyManager);
+    }
+
+    /// @notice Update the DelegationManager address
+    /// @param newDelegationManager The new DelegationManager address
+    function updateDelegationManagerAddress(
+        address newDelegationManager
+    ) public onlyOwner {
+        DELEGATION_MANAGER = IDelegationManager(newDelegationManager);
+    }
+
+    /// @notice Update the OperatorsRegistry address
+    /// @param newOperatorsRegistry The new OperatorsRegistry address
+    function updateOperatorsRegistryAddress(
+        address newOperatorsRegistry
+    ) public onlyOwner {
+        OPERATORS_REGISTRY = IOperatorsRegistryV1(newOperatorsRegistry);
     }
 
     // ========== Internal helpers ========== //
