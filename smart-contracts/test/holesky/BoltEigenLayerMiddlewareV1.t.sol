@@ -99,7 +99,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
     }
 
     /// Helper function to register an operator
-    function _registerOperator(address signer, string memory rpcEndpoint) public {
+    function _registerOperator(address signer, string memory rpcEndpoint, string memory extraData) public {
         // 1. Register the new EL operator in DelegationManager
         uint32 allocationDelay = 1;
         address delegationApprover = address(0x0); // this is optional, skip it
@@ -114,7 +114,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
             IAllocationManagerTypes.RegisterParams({
                 avs: address(middleware),
                 operatorSetIds: new uint32[](0), // specify the newly created operator set
-                data: bytes(rpcEndpoint)
+                data: abi.encode(rpcEndpoint, extraData)
             })
         );
 
@@ -124,7 +124,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
     }
 
     function testRegister() public {
-        _registerOperator(operator, "http://stopjava.com");
+        _registerOperator(operator, "http://stopjava.com", "operator1");
     }
 
     function testRegisterAndDepositCollateral() public {
@@ -143,7 +143,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         assertEq(holeskyWethStrategy.sharesToUnderlyingView(shares), 100 ether);
 
         // 2. Register the operator in both EL and the bolt AVS
-        _registerOperator(operator, "http://stopjava.com");
+        _registerOperator(operator, "http://stopjava.com", "operator1");
 
         // 3. Delegate funds from the staker to the operator
         vm.prank(staker);

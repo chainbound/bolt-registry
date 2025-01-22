@@ -12,11 +12,25 @@ library OperatorsLibV1 {
     /// @notice The time period for an operator to be disabled before they can be unregistered.
     uint48 public constant IMMUTABLE_PERIOD = uint48(1 days);
 
+    /// ========= Errors ========= //
+
+    /// @notice Error thrown when an invalid operator address is provided
+    error InvalidOperatorAddress();
+
+    /// @notice Error thrown when an invalid rpc endpoint is provided
+    error InvalidRpcEndpoint();
+
+    /// @notice Error thrown when an operator does not exist
+    error OperatorDoesNotExist();
+
+    /// ========= Structs ========= //
+
     /// @notice Operator struct
     struct Operator {
         address signer;
         string rpcEndpoint;
         address restakingMiddleware;
+        string extraData;
     }
 
     /// @notice A map of operators with their signer address as the key
@@ -24,6 +38,8 @@ library OperatorsLibV1 {
         PauseableEnumerableSet.AddressSet _keys;
         mapping(address key => Operator) _values;
     }
+
+    /// ========= Functions ========= //
 
     /// @notice Pause an operator in the map
     /// @param self The OperatorMap
@@ -46,17 +62,19 @@ library OperatorsLibV1 {
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator
     /// @param restakingMiddleware The address of the restaking middleware
+    /// @param extraData Arbitrary data the operator can provide as part of registration
     function add(
         OperatorMap storage self,
         address signer,
         string memory rpcEndpoint,
-        address restakingMiddleware
+        address restakingMiddleware,
+        string memory extraData
     ) internal {
-        require(signer != address(0), "Invalid operator address");
-        require(bytes(rpcEndpoint).length > 0, "Invalid rpc endpoint");
+        require(signer != address(0), InvalidOperatorAddress());
+        require(bytes(rpcEndpoint).length > 0, InvalidRpcEndpoint());
 
         self._keys.register(Time.timestamp(), signer);
-        self._values[signer] = Operator(signer, rpcEndpoint, restakingMiddleware);
+        self._values[signer] = Operator(signer, rpcEndpoint, restakingMiddleware, extraData);
     }
 
     /// @notice Remove an operator from the map
@@ -126,7 +144,8 @@ library OperatorsLibV1 {
         OperatorMap storage self,
         address signer
     ) internal view returns (Operator memory operator, bool isActive) {
-        require(self._keys.contains(signer), "Operator does not exist");
+        require(self._keys.contains(signer), OperatorDoesNotExist());
+
         isActive = self._keys.wasActiveAt(Time.timestamp(), signer);
         operator = self._values[signer];
     }
@@ -136,7 +155,7 @@ library OperatorsLibV1 {
     /// @param signer The address of the operator
     /// @param newRpcEndpoint The new rpc endpoint
     function updateRpcEndpoint(OperatorMap storage self, address signer, string memory newRpcEndpoint) internal {
-        require(self._keys.contains(signer), "Operator does not exist");
+        require(self._keys.contains(signer), OperatorDoesNotExist());
 
         Operator storage operator = self._values[signer];
         operator.rpcEndpoint = newRpcEndpoint;

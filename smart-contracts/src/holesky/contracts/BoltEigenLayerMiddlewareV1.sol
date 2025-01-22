@@ -232,20 +232,22 @@ contract BoltEigenLayerMiddlewareV1 is
     // ========= [pre-slashing] AVS Registration functions ========= //
 
     /// @notice Register an operator through the AVS Directory
-    /// @param rpc The RPC URL of the operator
+    /// @param rpcEndpoint The RPC URL of the operator
+    /// @param extraData Arbitrary data the operator can provide as part of registration
     /// @param operatorSignature The signature of the operator
     /// @dev This function is used before the ELIP-002 (slashing) EigenLayer upgrade to register operators.
     /// @dev Operators must use this function to register before the upgrade. After the upgrade, this will be removed.
     function registerThroughAVSDirectory(
-        string memory rpc,
+        string memory rpcEndpoint,
+        string memory extraData,
         ISignatureUtils.SignatureWithSaltAndExpiry calldata operatorSignature
     ) public {
         address operator = msg.sender;
-        
+
         require(DELEGATION_MANAGER.isOperator(operator), NotOperator());
 
         AVS_DIRECTORY.registerOperatorToAVS(operator, operatorSignature);
-        OPERATORS_REGISTRY.registerOperator(operator, rpc);
+        OPERATORS_REGISTRY.registerOperator(operator, rpcEndpoint, extraData);
     }
 
     // ========= AVS Registrar functions ========= //
@@ -253,7 +255,7 @@ contract BoltEigenLayerMiddlewareV1 is
     /// @notice Allows the AllocationManager to hook into the middleware to validate operator registration
     /// @param operator The address of the operator
     /// @param operatorSetIds The operator set IDs the operator is registering for
-    /// @param data Arbitrary data the operator can provide as part of registration
+    /// @param data Arbitrary ABI-encoded data the operator must provide as part of registration
     function registerOperator(
         address operator,
         uint32[] calldata operatorSetIds,
@@ -263,8 +265,11 @@ contract BoltEigenLayerMiddlewareV1 is
         // called by operators when registering to this AVS. If this call reverts,
         // the registration will be unsuccessful.
 
+        // Split the data into rpcEndpoint and extraData from ABI encoding
+        (string memory rpcEndpoint, string memory extraData) = abi.decode(data, (string, string));
+
         // We forward the call to the OperatorsRegistry to register the operator in its storage.
-        OPERATORS_REGISTRY.registerOperator(operator, string(data));
+        OPERATORS_REGISTRY.registerOperator(operator, rpcEndpoint, extraData);
     }
 
     /// @notice Allows the AllocationManager to hook into the middleware to validate operator deregistration

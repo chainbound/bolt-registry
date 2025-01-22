@@ -47,6 +47,9 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @notice Error thrown when an invalid restaking protocol name is provided
     error InvalidRestakingProtocolName(string restakingProtocol);
 
+    /// @notice Error thrown when an invalid rpc endpoint is provided
+    error InvalidRpcEndpoint();
+
     /// @notice Error thrown when an operator does not exist
     error OperatorDoesNotExist();
 
@@ -103,9 +106,16 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @notice Register an operator in the registry
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator
+    /// @param extraData Arbitrary data the operator can provide as part of registration
     /// @dev Only restaking middleware contracts can call this function
-    function registerOperator(address signer, string memory rpcEndpoint) external onlyMiddleware {
-        OPERATORS.add(signer, rpcEndpoint, msg.sender);
+    function registerOperator(
+        address signer,
+        string memory rpcEndpoint,
+        string memory extraData
+    ) external onlyMiddleware {
+        require(bytes(rpcEndpoint).length > 0, InvalidRpcEndpoint());
+
+        OPERATORS.add(signer, rpcEndpoint, msg.sender, extraData);
         emit OperatorRegistered(signer, rpcEndpoint, msg.sender);
     }
 
@@ -136,6 +146,8 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @param newRpcEndpoint The new rpc endpoint
     /// @dev Only restaking middleware contracts can call this function
     function updateOperatorRpcEndpoint(address signer, string memory newRpcEndpoint) external onlyMiddleware {
+        require(bytes(newRpcEndpoint).length > 0, InvalidRpcEndpoint());
+
         OPERATORS.updateRpcEndpoint(signer, newRpcEndpoint);
     }
 

@@ -42,7 +42,8 @@ interface IOperatorsRegistryV1 {
     /// @notice Register an operator in the registry
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator
-    function registerOperator(address signer, string memory rpcEndpoint) external;
+    /// @param extraData Arbitrary data the operator can provide as part of registration
+    function registerOperator(address signer, string memory rpcEndpoint, string memory extraData) external;
 
     /// @notice Deregister an operator from the registry
     /// @param signer The address of the operator
