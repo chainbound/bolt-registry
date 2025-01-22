@@ -89,9 +89,13 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     /// @notice Register an operator in the registry
     /// @param signer The address of the operator
     /// @param rpcEndpoint The rpc endpoint of the operator
-    /// @dev Only restaking middleware contracts can call this function
-    function registerOperator(address signer, string memory rpcEndpoint) external onlyMiddleware {
-        OPERATORS.add(signer, rpcEndpoint, msg.sender);
+    /// @param extraData Arbitrary data the operator can provide as part of registration
+    function registerOperator(
+        address signer,
+        string memory rpcEndpoint,
+        string memory extraData
+    ) external onlyMiddleware {
+        OPERATORS.add(signer, rpcEndpoint, msg.sender, extraData);
         emit OperatorRegistered(signer, rpcEndpoint, msg.sender);
     }
 

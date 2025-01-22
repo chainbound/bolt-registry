@@ -17,6 +17,7 @@ library OperatorsLibV1 {
         address signer;
         string rpcEndpoint;
         address restakingMiddleware;
+        string extraData;
     }
 
     /// @notice A map of operators with their signer address as the key
@@ -50,13 +51,14 @@ library OperatorsLibV1 {
         OperatorMap storage self,
         address signer,
         string memory rpcEndpoint,
-        address restakingMiddleware
+        address restakingMiddleware,
+        string memory extraData
     ) internal {
         require(signer != address(0), "Invalid operator address");
         require(bytes(rpcEndpoint).length > 0, "Invalid rpc endpoint");
 
         self._keys.register(Time.timestamp(), signer);
-        self._values[signer] = Operator(signer, rpcEndpoint, restakingMiddleware);
+        self._values[signer] = Operator(signer, rpcEndpoint, restakingMiddleware, extraData);
     }
 
     /// @notice Remove an operator from the map
