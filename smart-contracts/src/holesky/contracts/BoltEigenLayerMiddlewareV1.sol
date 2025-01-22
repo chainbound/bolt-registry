@@ -10,8 +10,10 @@ import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/Pausea
 import {
     IAllocationManager, IAllocationManagerTypes
 } from "@eigenlayer/src/contracts/interfaces/IAllocationManager.sol";
+import {ISignatureUtils} from "@eigenlayer/src/contracts/interfaces/ISignatureUtils.sol";
 import {IDelegationManager} from "@eigenlayer/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer/src/contracts/interfaces/IStrategyManager.sol";
+import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.sol";
 import {IAVSRegistrar} from "@eigenlayer/src/contracts/interfaces/IAVSRegistrar.sol";
 import {IStrategy} from "@eigenlayer/src/contracts/interfaces/IStrategy.sol";
 
@@ -31,6 +33,9 @@ contract BoltEigenLayerMiddlewareV1 is
     IBoltRestakingMiddlewareV1
 {
     using PauseableEnumerableSet for PauseableEnumerableSet.AddressSet;
+
+    /// @notice Address of the EigenLayer AVS Directory contract.
+    IAVSDirectory public AVS_DIRECTORY;
 
     /// @notice Address of the EigenLayer Allocation Manager contract.
     IAllocationManager public ALLOCATION_MANAGER;
@@ -58,7 +63,7 @@ contract BoltEigenLayerMiddlewareV1 is
      *
      * Total storage slots: 50
      */
-    uint256[44] private __gap;
+    uint256[42] private __gap;
 
     // ========= Events ========= //
 
@@ -74,16 +79,35 @@ contract BoltEigenLayerMiddlewareV1 is
     /// @notice Emitted when a strategy is removed from the whitelist
     event StrategyRemovedFromWhitelist(address strategy);
 
+    // ========= Errors ========= //
+
+    /// @notice Error thrown when an invalid strategy address is provided
+    error InvalidStrategyAddress();
+
+    /// @notice Error thrown when a strategy is already whitelisted
+    error StrategyAlreadyWhitelisted();
+
+    /// @notice Error thrown when a strategy is not whitelisted
+    error StrategyNotWhitelisted();
+
+    /// @notice Error thrown when an unallowed caller calls a function that requires an operator
+    error NotOperator();
+
+    /// @notice Error thrown when an unallowed caller calls a function that requires the AllocationManager
+    error NotAllocationManager();
+
     // ========= Initializer & Proxy functionality ========= //
 
     /// @notice Initialize the contract
     /// @param owner The address of the owner
+    /// @param _avsDirectory The address of the EigenLayer AVS Directory contract
     /// @param _eigenlayerAllocationManager The address of the EigenLayer Allocation Manager contract
     /// @param _eigenlayerDelegationManager The address of the EigenLayer Delegation Manager contract
     /// @param _eigenlayerStrategyManager The address of the EigenLayer Strategy Manager contract
     /// @param _operatorsRegistry The address of the Operators Registry contract
     function initialize(
         address owner,
+        IAVSDirectory _avsDirectory,
         IAllocationManager _eigenlayerAllocationManager,
         IDelegationManager _eigenlayerDelegationManager,
         IStrategyManager _eigenlayerStrategyManager,
@@ -91,6 +115,7 @@ contract BoltEigenLayerMiddlewareV1 is
     ) public initializer {
         __Ownable_init(owner);
 
+        AVS_DIRECTORY = _avsDirectory;
         ALLOCATION_MANAGER = _eigenlayerAllocationManager;
         DELEGATION_MANAGER = _eigenlayerDelegationManager;
         STRATEGY_MANAGER = _eigenlayerStrategyManager;
@@ -104,6 +129,14 @@ contract BoltEigenLayerMiddlewareV1 is
         address newImplementation
     ) internal override onlyOwner {}
 
+    // ========= modifiers ========= //
+
+    /// @notice Modifier to check if the caller is the AllocationManager
+    modifier onlyAllocationManager() {
+        require(msg.sender == address(ALLOCATION_MANAGER), NotAllocationManager());
+        _;
+    }
+
     // ========= AVS functions ========= //
 
     /// @notice Get the collaterals and amounts staked by an operator across the whitelisted strategies
@@ -116,6 +149,8 @@ contract BoltEigenLayerMiddlewareV1 is
         // Use the beginning of the current epoch to check which strategies were enabled at that time.
         // Only the strategies enabled at the beginning of the epoch are considered for the operator's collateral.
         uint48 timestamp = OPERATORS_REGISTRY.getCurrentEpochStartTimestamp();
+
+        // Only take strategies that are active at <timestamp>
         IStrategy[] memory activeStrategies = _getActiveStrategiesAt(timestamp);
 
         address[] memory collateralTokens = new address[](activeStrategies.length);
@@ -138,9 +173,33 @@ contract BoltEigenLayerMiddlewareV1 is
     /// @param collateral The collateral token address
     /// @return The amount staked by the operator for the collateral
     function getOperatorStake(address operator, address collateral) public view returns (uint256) {
-        // TODO: impl
+        // Use the beginning of the current epoch to check which strategies were enabled at that time.
+        // Only the strategies enabled at the beginning of the epoch are considered for the operator's stake.
+        uint48 timestamp = OPERATORS_REGISTRY.getCurrentEpochStartTimestamp();
 
-        return 0;
+        uint256 activeStake = 0;
+        for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
+            (address strategy, uint48 enabledAt, uint48 disabledAt) = whitelistedStrategies.at(i);
+
+            if (!_wasEnabledAt(enabledAt, disabledAt, timestamp)) {
+                continue;
+            }
+
+            if (address(IStrategy(strategy).underlyingToken()) != collateral) {
+                continue;
+            }
+
+            // get the shares of the operator for the strategy
+            // NOTE: the EL slashing-magnitudes branch removed the operatorShares(operator, strategy) function:
+            // https://github.com/Layr-Labs/eigenlayer-contracts/blob/dev/src/contracts/interfaces/IDelegationManager.sol#L352-L359
+            // so we need to use getOperatorShares(operator, [strategy]) instead.
+            IStrategy[] memory strategies = new IStrategy[](1);
+            strategies[0] = IStrategy(strategy);
+            uint256[] memory shares = DELEGATION_MANAGER.getOperatorShares(operator, strategies);
+            activeStake += IStrategy(strategy).sharesToUnderlyingView(shares[0]);
+        }
+
+        return activeStake;
     }
 
     /// @notice Get the list of whitelisted strategies for this AVS and whether they are enabled
@@ -162,25 +221,61 @@ contract BoltEigenLayerMiddlewareV1 is
         return (strategies, enabled);
     }
 
+    /// @notice Get the active strategies for this AVS
+    /// @return The active strategies
+    function getActiveStrategies() public view returns (IStrategy[] memory) {
+        // Use the beginning of the current epoch to check which strategies were enabled at that time.
+        uint48 timestamp = OPERATORS_REGISTRY.getCurrentEpochStartTimestamp();
+        return _getActiveStrategiesAt(timestamp);
+    }
+
+    // ========= [pre-slashing] AVS Registration functions ========= //
+
+    /// @notice Register an operator through the AVS Directory
+    /// @param rpcEndpoint The RPC URL of the operator
+    /// @param extraData Arbitrary data the operator can provide as part of registration
+    /// @param operatorSignature The signature of the operator
+    /// @dev This function is used before the ELIP-002 (slashing) EigenLayer upgrade to register operators.
+    /// @dev Operators must use this function to register before the upgrade. After the upgrade, this will be removed.
+    function registerThroughAVSDirectory(
+        string memory rpcEndpoint,
+        string memory extraData,
+        ISignatureUtils.SignatureWithSaltAndExpiry calldata operatorSignature
+    ) public {
+        address operator = msg.sender;
+
+        require(DELEGATION_MANAGER.isOperator(operator), NotOperator());
+
+        AVS_DIRECTORY.registerOperatorToAVS(operator, operatorSignature);
+        OPERATORS_REGISTRY.registerOperator(operator, rpcEndpoint, extraData);
+    }
+
     // ========= AVS Registrar functions ========= //
 
     /// @notice Allows the AllocationManager to hook into the middleware to validate operator registration
     /// @param operator The address of the operator
     /// @param operatorSetIds The operator set IDs the operator is registering for
-    /// @param data Arbitrary data the operator can provide as part of registration
-    function registerOperator(address operator, uint32[] calldata operatorSetIds, bytes calldata data) external {
+    /// @param data Arbitrary ABI-encoded data the operator must provide as part of registration
+    function registerOperator(
+        address operator,
+        uint32[] calldata operatorSetIds,
+        bytes calldata data
+    ) external onlyAllocationManager {
         // NOTE: this function is called by AllocationManager.registerForOperatorSets(),
         // called by operators when registering to this AVS. If this call reverts,
         // the registration will be unsuccessful.
 
+        // Split the data into rpcEndpoint and extraData from ABI encoding
+        (string memory rpcEndpoint, string memory extraData) = abi.decode(data, (string, string));
+
         // We forward the call to the OperatorsRegistry to register the operator in its storage.
-        OPERATORS_REGISTRY.registerOperator(operator, string(data), "");
+        OPERATORS_REGISTRY.registerOperator(operator, rpcEndpoint, extraData);
     }
 
     /// @notice Allows the AllocationManager to hook into the middleware to validate operator deregistration
     /// @param operator The address of the operator
     /// @param operatorSetIds The operator set IDs the operator is deregistering from
-    function deregisterOperator(address operator, uint32[] calldata operatorSetIds) external {
+    function deregisterOperator(address operator, uint32[] calldata operatorSetIds) external onlyAllocationManager {
         // NOTE: this function is called by AllocationManager.deregisterFromOperatorSets,
         // called by operators when deregistering from this AVS.
         // Failure does nothing here: if this call reverts the deregistration will still go through.
@@ -198,9 +293,9 @@ contract BoltEigenLayerMiddlewareV1 is
     function addStrategyToWhitelist(
         address strategy
     ) public onlyOwner {
-        require(strategy != address(0), "Invalid strategy address");
-        require(!whitelistedStrategies.contains(strategy), "Strategy already whitelisted");
-        require(STRATEGY_MANAGER.strategyIsWhitelistedForDeposit(IStrategy(strategy)), "Strategy not allowed");
+        require(strategy != address(0), InvalidStrategyAddress());
+        require(!whitelistedStrategies.contains(strategy), StrategyAlreadyWhitelisted());
+        require(STRATEGY_MANAGER.strategyIsWhitelistedForDeposit(IStrategy(strategy)), StrategyNotWhitelisted());
 
         whitelistedStrategies.register(Time.timestamp(), strategy);
         emit StrategyAddedToWhitelist(strategy);
@@ -211,7 +306,7 @@ contract BoltEigenLayerMiddlewareV1 is
     function pauseStrategy(
         address strategy
     ) public onlyOwner {
-        require(whitelistedStrategies.contains(strategy), "Strategy not whitelisted");
+        require(whitelistedStrategies.contains(strategy), StrategyNotWhitelisted());
 
         whitelistedStrategies.pause(Time.timestamp(), strategy);
         emit StrategyPaused(strategy);
@@ -222,7 +317,7 @@ contract BoltEigenLayerMiddlewareV1 is
     function unpauseStrategy(
         address strategy
     ) public onlyOwner {
-        require(whitelistedStrategies.contains(strategy), "Strategy not whitelisted");
+        require(whitelistedStrategies.contains(strategy), StrategyNotWhitelisted());
 
         whitelistedStrategies.unpause(Time.timestamp(), OPERATORS_REGISTRY.EPOCH_DURATION(), strategy);
         emit StrategyUnpaused(strategy);
@@ -234,7 +329,7 @@ contract BoltEigenLayerMiddlewareV1 is
     function removeStrategyFromWhitelist(
         address strategy
     ) public onlyOwner {
-        require(whitelistedStrategies.contains(strategy), "Strategy not whitelisted");
+        require(whitelistedStrategies.contains(strategy), StrategyNotWhitelisted());
 
         whitelistedStrategies.unregister(Time.timestamp(), OPERATORS_REGISTRY.EPOCH_DURATION(), strategy);
         emit StrategyRemovedFromWhitelist(strategy);
@@ -269,11 +364,16 @@ contract BoltEigenLayerMiddlewareV1 is
     }
 
     /// @notice Update the metadata URI for this AVS
+    /// @param contractName The name of the contract to update the metadata URI for
     /// @param metadataURI The new metadata URI
-    function updateAVSMetadataURI(
-        string calldata metadataURI
-    ) public onlyOwner {
-        ALLOCATION_MANAGER.updateAVSMetadataURI(address(this), metadataURI);
+    function updateAVSMetadataURI(string calldata contractName, string calldata metadataURI) public onlyOwner {
+        bytes32 contractNameHash = keccak256(abi.encodePacked(contractName));
+
+        if (contractNameHash == keccak256("ALLOCATION_MANAGER")) {
+            ALLOCATION_MANAGER.updateAVSMetadataURI(address(this), metadataURI);
+        } else if (contractNameHash == keccak256("AVS_DIRECTORY")) {
+            AVS_DIRECTORY.updateAVSMetadataURI(metadataURI);
+        }
     }
 
     // ========== Internal helpers ========== //
@@ -285,7 +385,7 @@ contract BoltEigenLayerMiddlewareV1 is
         IStrategy[] calldata strategies
     ) internal view {
         for (uint256 i = 0; i < strategies.length; i++) {
-            require(whitelistedStrategies.contains(address(strategies[i])), "Strategy not whitelisted");
+            require(whitelistedStrategies.contains(address(strategies[i])), StrategyNotWhitelisted());
         }
     }
 
@@ -296,12 +396,12 @@ contract BoltEigenLayerMiddlewareV1 is
         uint48 timestamp
     ) internal view returns (IStrategy[] memory) {
         uint256 activeCount = 0;
-        IStrategy[] memory activeStrategies = new IStrategy[](whitelistedStrategies.length());
+        address[] memory activeStrategies = new address[](whitelistedStrategies.length());
         for (uint256 i = 0; i < whitelistedStrategies.length(); i++) {
             (address strategy, uint48 enabledAt, uint48 disabledAt) = whitelistedStrategies.at(i);
 
             if (_wasEnabledAt(enabledAt, disabledAt, timestamp)) {
-                activeStrategies[activeCount] = IStrategy(strategy);
+                activeStrategies[activeCount] = strategy;
                 activeCount++;
             }
         }
@@ -309,8 +409,9 @@ contract BoltEigenLayerMiddlewareV1 is
         // Resize the array to the actual number of active strategies
         IStrategy[] memory result = new IStrategy[](activeCount);
         for (uint256 i = 0; i < activeCount; i++) {
-            result[i] = activeStrategies[i];
+            result[i] = IStrategy(activeStrategies[i]);
         }
+        return result;
     }
 
     /// @notice Check if a map entry was active at a given timestamp.

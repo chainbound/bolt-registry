@@ -11,12 +11,13 @@ import {IDelegationManager} from "@eigenlayer/src/contracts/interfaces/IDelegati
 import {IStrategyManager} from "@eigenlayer/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "@eigenlayer/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "@eigenlayer/src/contracts/interfaces/ISignatureUtils.sol";
+import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.sol";
 import {OperatorSet} from "@eigenlayer/src/contracts/libraries/OperatorSetLib.sol";
 
 import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
 import {IOperatorsRegistryV1} from "../../src/holesky/interfaces/IOperatorsRegistryV1.sol";
 import {BoltEigenLayerMiddlewareV1} from "../../src/holesky/contracts/BoltEigenLayerMiddlewareV1.sol";
-import {IWETH} from "./util/IWETH.sol";
+import {IWETH} from "../util/IWETH.sol";
 
 contract BoltEigenLayerMiddlewareV1Test is Test {
     OperatorsRegistryV1 registry;
@@ -29,6 +30,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
     IAllocationManager holeskyAllocationManager = IAllocationManager(0x78469728304326CBc65f8f95FA756B0B73164462);
     IDelegationManager holeskyDelegationManager = IDelegationManager(0xA44151489861Fe9e3055d95adC98FbD462B948e7);
     IStrategyManager holeskyStrategyManager = IStrategyManager(0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6);
+    IAVSDirectory holeskyAVSDirectory = IAVSDirectory(0x055733000064333CaDDbC92763c58BF0192fFeBf);
 
     IERC20 holeskyStEth = IERC20(0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034);
     IStrategy holeskyStEthStrategy = IStrategy(0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3);
@@ -56,12 +58,26 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         // --- Deploy the EL middleware ---
         middleware = new BoltEigenLayerMiddlewareV1();
         middleware.initialize(
-            admin, holeskyAllocationManager, holeskyDelegationManager, holeskyStrategyManager, registry
+            admin,
+            holeskyAVSDirectory,
+            holeskyAllocationManager,
+            holeskyDelegationManager,
+            holeskyStrategyManager,
+            registry
         );
 
         // 1. Whitelist the strategies in the middleware
         middleware.addStrategyToWhitelist(address(holeskyStEthStrategy));
         middleware.addStrategyToWhitelist(address(holeskyWethStrategy));
+
+        // check that the strategies are whitelisted
+        (address[] memory whitelistedStrategies, bool[] memory statuses) = middleware.getWhitelistedStrategies();
+        assertEq(whitelistedStrategies.length, 2);
+        assertEq(statuses.length, 2);
+        assertEq(whitelistedStrategies[0], address(holeskyStEthStrategy));
+        assertEq(whitelistedStrategies[1], address(holeskyWethStrategy));
+        assertEq(statuses[0], true);
+        assertEq(statuses[1], true);
 
         IStrategy[] memory strategies = new IStrategy[](2);
         strategies[0] = holeskyStEthStrategy;
@@ -77,28 +93,28 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         registry.updateRestakingMiddleware("EIGENLAYER", middleware);
 
         // 4. Update the metadata URI
-        middleware.updateAVSMetadataURI("https://grugbrain.dev");
+        middleware.updateAVSMetadataURI("ALLOCATION_MANAGER", "https://grugbrain.dev");
 
         vm.stopPrank();
     }
 
     /// Helper function to register an operator
-    function _registerOperator(address signer, string memory rpcEndpoint) public {
+    function _registerOperator(address signer, string memory rpcEndpoint, string memory extraData) public {
         // 1. Register the new EL operator in DelegationManager
         uint32 allocationDelay = 1;
         address delegationApprover = address(0x0); // this is optional, skip it
         string memory uri = "some-meetadata.uri.com";
-        vm.prank(operator);
+        vm.prank(signer);
         holeskyDelegationManager.registerAsOperator(delegationApprover, allocationDelay, uri);
 
         // 2. Register the operator in the bolt AVS
-        vm.prank(operator);
+        vm.prank(signer);
         holeskyAllocationManager.registerForOperatorSets(
-            operator,
+            signer,
             IAllocationManagerTypes.RegisterParams({
                 avs: address(middleware),
                 operatorSetIds: new uint32[](0), // specify the newly created operator set
-                data: bytes(rpcEndpoint)
+                data: abi.encode(rpcEndpoint, extraData)
             })
         );
 
@@ -108,7 +124,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
     }
 
     function testRegister() public {
-        _registerOperator(operator, "http://stopjava.com");
+        _registerOperator(operator, "http://stopjava.com", "operator1");
     }
 
     function testRegisterAndDepositCollateral() public {
@@ -127,7 +143,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         assertEq(holeskyWethStrategy.sharesToUnderlyingView(shares), 100 ether);
 
         // 2. Register the operator in both EL and the bolt AVS
-        _registerOperator(operator, "http://stopjava.com");
+        _registerOperator(operator, "http://stopjava.com", "operator1");
 
         // 3. Delegate funds from the staker to the operator
         vm.prank(staker);
@@ -151,6 +167,10 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
 
         vm.prank(operator);
         holeskyAllocationManager.modifyAllocations(operator, allocs);
+
+        // make sure the strategies are active in the middleware
+        IStrategy[] memory activeStrats = middleware.getActiveStrategies();
+        assertEq(activeStrats.length, 2);
 
         // 5. try to read the operator's collateral directly on the avs
         (address[] memory collaterals, uint256[] memory amounts) = middleware.getOperatorCollaterals(operator);
