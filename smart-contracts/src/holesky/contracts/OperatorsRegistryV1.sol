@@ -39,6 +39,20 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
      */
     uint256[43] private __gap;
 
+    // ========= Errors ========= //
+
+    /// @notice Error thrown when a non-middleware contract calls a middleware function
+    error OnlyRestakingMiddlewares();
+
+    /// @notice Error thrown when an invalid restaking protocol name is provided
+    error InvalidRestakingProtocolName(string restakingProtocol);
+
+    /// @notice Error thrown when an operator does not exist
+    error OperatorDoesNotExist();
+
+    /// @notice Error thrown when an invalid middleware address is provided
+    error InvalidMiddlewareAddress();
+
     // ========= Initializer & Proxy functionality ========= //
 
     /// @notice Initialize the contract
@@ -63,7 +77,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
         require(
             msg.sender == address(EIGENLAYER_RESTAKING_MIDDLEWARE)
                 || msg.sender == address(SYMBIOTIC_RESTAKING_MIDDLEWARE),
-            "Only restaking middlewares can call this function"
+            OnlyRestakingMiddlewares()
         );
         _;
     }
@@ -132,7 +146,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
     function deregisterOperator(
         address signer
     ) external onlyMiddleware {
-        require(OPERATORS.contains(signer), "Operator does not exist");
+        require(OPERATORS.contains(signer), OperatorDoesNotExist());
 
         OPERATORS.remove(signer);
         emit OperatorDeregistered(signer, msg.sender);
@@ -172,7 +186,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
         string calldata restakingProtocol,
         IBoltRestakingMiddlewareV1 newMiddleware
     ) public onlyOwner {
-        require(address(newMiddleware) != address(0), "Invalid middleware address");
+        require(address(newMiddleware) != address(0), InvalidMiddlewareAddress());
 
         bytes32 protocolNameHash = keccak256(abi.encodePacked(restakingProtocol));
 
@@ -181,7 +195,7 @@ contract OperatorsRegistryV1 is OwnableUpgradeable, UUPSUpgradeable, IOperatorsR
         } else if (protocolNameHash == keccak256("SYMBIOTIC")) {
             SYMBIOTIC_RESTAKING_MIDDLEWARE = newMiddleware;
         } else {
-            revert("Invalid restaking protocol name. Valid values are: 'EIGENLAYER', 'SYMBIOTIC'");
+            revert InvalidRestakingProtocolName(restakingProtocol);
         }
     }
 }

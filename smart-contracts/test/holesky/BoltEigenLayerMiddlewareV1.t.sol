@@ -11,6 +11,7 @@ import {IDelegationManager} from "@eigenlayer/src/contracts/interfaces/IDelegati
 import {IStrategyManager} from "@eigenlayer/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "@eigenlayer/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "@eigenlayer/src/contracts/interfaces/ISignatureUtils.sol";
+import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.sol";
 import {OperatorSet} from "@eigenlayer/src/contracts/libraries/OperatorSetLib.sol";
 
 import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
@@ -29,6 +30,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
     IAllocationManager holeskyAllocationManager = IAllocationManager(0x78469728304326CBc65f8f95FA756B0B73164462);
     IDelegationManager holeskyDelegationManager = IDelegationManager(0xA44151489861Fe9e3055d95adC98FbD462B948e7);
     IStrategyManager holeskyStrategyManager = IStrategyManager(0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6);
+    IAVSDirectory holeskyAVSDirectory = IAVSDirectory(0x055733000064333CaDDbC92763c58BF0192fFeBf);
 
     IERC20 holeskyStEth = IERC20(0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034);
     IStrategy holeskyStEthStrategy = IStrategy(0x7D704507b76571a51d9caE8AdDAbBFd0ba0e63d3);
@@ -56,7 +58,12 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         // --- Deploy the EL middleware ---
         middleware = new BoltEigenLayerMiddlewareV1();
         middleware.initialize(
-            admin, holeskyAllocationManager, holeskyDelegationManager, holeskyStrategyManager, registry
+            admin,
+            holeskyAVSDirectory,
+            holeskyAllocationManager,
+            holeskyDelegationManager,
+            holeskyStrategyManager,
+            registry
         );
 
         // 1. Whitelist the strategies in the middleware
@@ -97,13 +104,13 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         uint32 allocationDelay = 1;
         address delegationApprover = address(0x0); // this is optional, skip it
         string memory uri = "some-meetadata.uri.com";
-        vm.prank(operator);
+        vm.prank(signer);
         holeskyDelegationManager.registerAsOperator(delegationApprover, allocationDelay, uri);
 
         // 2. Register the operator in the bolt AVS
-        vm.prank(operator);
+        vm.prank(signer);
         holeskyAllocationManager.registerForOperatorSets(
-            operator,
+            signer,
             IAllocationManagerTypes.RegisterParams({
                 avs: address(middleware),
                 operatorSetIds: new uint32[](0), // specify the newly created operator set
