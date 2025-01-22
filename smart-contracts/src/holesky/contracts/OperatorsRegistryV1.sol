@@ -43,6 +43,10 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
      */
     uint256[44] private __gap;
 
+    // ===================== ERRORS ======================== //
+    error MissingOperatorRpc();
+    error InvalidSigner();
+
     // ========= Initializer & Proxy functionality ========= //
 
     /// @notice Initialize the contract
@@ -99,9 +103,14 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         string memory rpcEndpoint,
         string memory extraData
     ) external onlyMiddleware {
-        // TODO: Checks
+        if (bytes(rpcEndpoint).length == 0) {
+            revert MissingOperatorRpc();
+        }
 
-        // TODO: should the enable timestamp here be the epoch instead?
+        if (signer == address(0)) {
+            revert InvalidSigner();
+        }
+
         _operatorAddresses.register(Time.timestamp(), signer);
         operators[signer] = Operator(signer, rpcEndpoint, msg.sender, extraData);
 
@@ -143,7 +152,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     /// @notice Deregister an operator from the registry
     /// @param signer The address of the operator
     /// @dev Only restaking middleware contracts can call this function
-    /// @dev Operators need to be paused and wait for IMMUTABLE_PERIOD() before they can be deregistered.
+    /// @dev Operators need to be paused and wait for EPOCH_DURATION() before they can be deregistered.
     function deregisterOperator(
         address signer
     ) external onlyMiddleware {
@@ -211,6 +220,19 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         address signer
     ) public view returns (bool) {
         return _operatorAddresses.wasActiveAt(Time.timestamp(), signer);
+    }
+
+    /// @notice Cleans up any expired operators (i.e. paused + EPOCH_DURATION has passed).
+    function cleanup() public {
+        for (uint256 i = 0; i < _operatorAddresses.length(); i++) {
+            (address signer,,) = _operatorAddresses.at(i);
+            if (_operatorAddresses.checkUnregister(Time.timestamp(), EPOCH_DURATION, signer)) {
+                _operatorAddresses.unregister(Time.timestamp(), EPOCH_DURATION, signer);
+                delete operators[signer];
+
+                emit OperatorDeregistered(signer, msg.sender);
+            }
+        }
     }
 
     // ========= Restaking Middlewres ========= //

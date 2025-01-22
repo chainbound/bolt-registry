@@ -133,7 +133,7 @@ contract SymbioticMiddlewareTest is Test {
         vm.stopPrank();
     }
 
-    function testRegisterOperator() public {
+    function testRegisterOperatorNoCollateral() public {
         vm.startPrank(operator);
         // Symbiotic registration
         IOperatorRegistry(operatorRegistry).registerOperator();
@@ -147,7 +147,67 @@ contract SymbioticMiddlewareTest is Test {
 
         middleware.registerOperator("https://rpc.boltprotocol.xyz", "BOLT");
 
+        assert(registry.isOperator(operator));
+
+        // Activation requires a second to have passed
+        vm.warp(block.timestamp + 1);
+        assert(registry.isActiveOperator(operator));
+
         vm.stopPrank();
+    }
+
+    function testDeregisterOperator() public {
+        vm.startPrank(operator);
+        // Symbiotic registration
+        IOperatorRegistry(operatorRegistry).registerOperator();
+        IOptInService(operatorNetOptin).optIn(network);
+
+        // Bolt registration
+        vm.expectEmit();
+        emit IOperatorsRegistryV1.OperatorRegistered(
+            operator, "https://rpc.boltprotocol.xyz", address(middleware), "BOLT"
+        );
+
+        middleware.registerOperator("https://rpc.boltprotocol.xyz", "BOLT");
+
+        // Activation requires a second to have passed
+        vm.warp(block.timestamp + 1);
+        assert(registry.isActiveOperator(operator));
+
+        middleware.deregisterOperator();
+
+        vm.warp(block.timestamp + 1);
+        assert(!registry.isActiveOperator(operator));
+
+        vm.warp(block.timestamp + registry.EPOCH_DURATION());
+        registry.cleanup();
+        assert(!registry.isOperator(operator));
+    }
+
+    function testCleanup() public {
+        vm.startPrank(operator);
+        // Symbiotic registration
+        IOperatorRegistry(operatorRegistry).registerOperator();
+        IOptInService(operatorNetOptin).optIn(network);
+
+        // Bolt registration
+        vm.expectEmit();
+        emit IOperatorsRegistryV1.OperatorRegistered(
+            operator, "https://rpc.boltprotocol.xyz", address(middleware), "BOLT"
+        );
+
+        middleware.registerOperator("https://rpc.boltprotocol.xyz", "BOLT");
+
+        // Activation requires a second to have passed
+        vm.warp(block.timestamp + 1);
+        assert(registry.isActiveOperator(operator));
+
+        middleware.deregisterOperator();
+
+        vm.warp(block.timestamp + registry.EPOCH_DURATION());
+        // Clean up is only possible EPOCH_DURATION after deregistation
+        registry.cleanup();
+        assert(!registry.isOperator(operator));
     }
 
     function testWhitelistVault() public {
@@ -164,17 +224,19 @@ contract SymbioticMiddlewareTest is Test {
         vm.stopPrank();
     }
 
-    function testDeregisterVault() public {
+    function testRemoveVault() public {
         vm.startPrank(admin);
 
         middleware.whitelistVault(address(wstEthVault));
         assertEq(middleware.vaultWhitelistLength(), 1);
 
         middleware.pauseVault(address(wstEthVault));
-        // Fast-forward for epoch duration, to pass the immutable period
-        vm.warp(block.timestamp + EPOCH_DURATION);
+        // Pausing takes a sec
+        vm.warp(block.timestamp + 1);
         assertEq(middleware.isVaultActive(address(wstEthVault)), false);
 
+        // To remove, we need to pass the immutable period (EPOCH_DURATION)
+        vm.warp(block.timestamp + registry.EPOCH_DURATION());
         middleware.removeVault(address(wstEthVault));
         assertEq(middleware.vaultWhitelistLength(), 0);
     }

@@ -99,6 +99,9 @@ interface IOperatorsRegistryV1 {
         address signer
     ) external view returns (bool);
 
+    /// @notice Cleans up any expired operators (i.e. paused + IMMUTABLE_PERIOD has passed).
+    function cleanup() external;
+
     /// @notice Returns the timestamp of when the current epoch started
     function getCurrentEpochStartTimestamp() external view returns (uint48);
 }

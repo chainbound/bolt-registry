@@ -167,8 +167,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
      * @notice Deregister an operator from the registry.
      */
     function deregisterOperator() public {
-        OPERATORS_REGISTRY.deregisterOperator(msg.sender);
-
+        OPERATORS_REGISTRY.pauseOperator(msg.sender);
         // TODO(V3): in the future we may not want to remove the vaults immediately, in case
         // of a pending penalty that the operator is trying to avoid.
     }
