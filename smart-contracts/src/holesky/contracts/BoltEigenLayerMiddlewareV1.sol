@@ -364,11 +364,16 @@ contract BoltEigenLayerMiddlewareV1 is
     }
 
     /// @notice Update the metadata URI for this AVS
+    /// @param contractName The name of the contract to update the metadata URI for
     /// @param metadataURI The new metadata URI
-    function updateAVSMetadataURI(
-        string calldata metadataURI
-    ) public onlyOwner {
-        ALLOCATION_MANAGER.updateAVSMetadataURI(address(this), metadataURI);
+    function updateAVSMetadataURI(string calldata contractName, string calldata metadataURI) public onlyOwner {
+        bytes32 contractNameHash = keccak256(abi.encodePacked(contractName));
+
+        if (contractNameHash == keccak256("ALLOCATION_MANAGER")) {
+            ALLOCATION_MANAGER.updateAVSMetadataURI(address(this), metadataURI);
+        } else if (contractNameHash == keccak256("AVS_DIRECTORY")) {
+            AVS_DIRECTORY.updateAVSMetadataURI(metadataURI);
+        }
     }
 
     // ========== Internal helpers ========== //

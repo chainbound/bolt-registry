@@ -17,7 +17,7 @@ import {OperatorSet} from "@eigenlayer/src/contracts/libraries/OperatorSetLib.so
 import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
 import {IOperatorsRegistryV1} from "../../src/holesky/interfaces/IOperatorsRegistryV1.sol";
 import {BoltEigenLayerMiddlewareV1} from "../../src/holesky/contracts/BoltEigenLayerMiddlewareV1.sol";
-import {IWETH} from "./util/IWETH.sol";
+import {IWETH} from "../util/IWETH.sol";
 
 contract BoltEigenLayerMiddlewareV1Test is Test {
     OperatorsRegistryV1 registry;
@@ -93,7 +93,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         registry.updateRestakingMiddleware("EIGENLAYER", middleware);
 
         // 4. Update the metadata URI
-        middleware.updateAVSMetadataURI("https://grugbrain.dev");
+        middleware.updateAVSMetadataURI("ALLOCATION_MANAGER", "https://grugbrain.dev");
 
         vm.stopPrank();
     }
