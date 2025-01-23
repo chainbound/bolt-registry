@@ -69,8 +69,6 @@ contract DeployRegistry is Script {
         address symbioticMiddleware = Upgrades.deployUUPSProxy(symbioticMiddlewareName, initParams, opts);
         console.log("Deployed %s at %s", symbioticMiddlewareName, symbioticMiddleware);
 
-        registry.updateRestakingMiddleware("SYMBIOTIC", IBoltRestakingMiddlewareV1(symbioticMiddleware));
-
         initParams = abi.encodeCall(
             BoltEigenLayerMiddlewareV1.initialize,
             (
@@ -87,9 +85,18 @@ contract DeployRegistry is Script {
         address eigenLayerMiddleware = Upgrades.deployUUPSProxy(eigenLayerMiddlewareName, initParams, opts);
         console.log("Deployed %s at %s", eigenLayerMiddlewareName, eigenLayerMiddleware);
 
-        registry.updateRestakingMiddleware("EIGENLAYER", IBoltRestakingMiddlewareV1(eigenLayerMiddleware));
+        // ================ EigenLayer Post-Deploy Steps ================ //
+        // These steps need to be undertaken with the ADMIN Safe.
+        //
+        // 1. updateRestakingMiddleware on OperatorsRegistry with EIGENLAYER
+        // 2. Initialize AVS with AVS directory: updateAVSMetadataURI
+        // 3. Whitelist strategies
 
-        postDeployEigenLayer(BoltEigenLayerMiddlewareV1(eigenLayerMiddleware));
+        // ================ Symbiotic Post-Deploy Steps ================ //
+        // These steps need to be undertaken with the ADMIN Safe.
+        //
+        // 1. updateRestakingMiddleware on OperatorsRegistry with SYMBIOTIC
+        // 2. Whitelist vaults
 
         vm.stopBroadcast();
     }
