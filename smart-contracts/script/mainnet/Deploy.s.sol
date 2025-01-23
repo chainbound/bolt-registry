@@ -37,9 +37,9 @@ contract DeployRegistry is Script {
     string eigenLayerMiddlewareName = "BoltEigenLayerMiddlewareV1";
 
     // =============== Symbiotic Mainnet Deployments ================== //
-    IRegistry vaultRegistry = IRegistry(0x407A039D94948484D356eFB765b3c74382A050B4);
-    IRegistry operatorRegistry = IRegistry(0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548);
-    IOptInService operatorNetOptin = IOptInService(0x58973d16FFA900D11fC22e5e2B6840d9f7e13401);
+    IRegistry vaultRegistry = IRegistry(0xAEb6bdd95c502390db8f52c8909F703E9Af6a346);
+    IRegistry operatorRegistry = IRegistry(0xAd817a6Bc954F678451A71363f04150FDD81Af9F);
+    IOptInService operatorNetOptin = IOptInService(0x7133415b33B438843D581013f98A08704316633c);
 
     // =============== EigenLayer Mainnet Deployments ================== //
     IDelegationManager delegationManager = IDelegationManager(0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A);
