@@ -44,28 +44,13 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     uint256[44] private __gap;
 
     // ===================== ERRORS ======================== //
+
     error InvalidRpc();
     error InvalidSigner();
     error Unauthorized();
     error UnknownOperator();
-    error InvalidMiddleware(string reason);
-
-    // ========= Errors ========= //
-
-    /// @notice Error thrown when a non-middleware contract calls a middleware function
     error OnlyRestakingMiddlewares();
-
-    /// @notice Error thrown when an invalid restaking protocol name is provided
-    error InvalidRestakingProtocolName(string restakingProtocol);
-
-    /// @notice Error thrown when an invalid rpc endpoint is provided
-    error InvalidRpcEndpoint();
-
-    /// @notice Error thrown when an operator does not exist
-    error OperatorDoesNotExist();
-
-    /// @notice Error thrown when an invalid middleware address is provided
-    error InvalidMiddlewareAddress();
+    error InvalidMiddleware(string reason);
 
     // ========= Initializer & Proxy functionality ========= //
 

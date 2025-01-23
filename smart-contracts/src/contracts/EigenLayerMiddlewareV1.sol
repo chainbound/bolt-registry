@@ -74,20 +74,11 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
 
     // ========= Errors ========= //
 
-    /// @notice Error thrown when an invalid strategy address is provided
-    error InvalidStrategyAddress();
-
-    /// @notice Error thrown when a strategy is already whitelisted
-    error StrategyAlreadyWhitelisted();
-
-    /// @notice Error thrown when a strategy is not whitelisted
-    error UnauthorizedStrategy();
-
-    /// @notice Error thrown when an unallowed caller calls a function that requires an operator
     error NotOperator();
-
-    /// @notice Error thrown when an unallowed caller calls a function that requires the AllocationManager
+    error UnauthorizedStrategy();
     error NotAllocationManager();
+    error InvalidStrategyAddress();
+    error StrategyAlreadyWhitelisted();
 
     // ========= Initializer & Proxy functionality ========= //
 
