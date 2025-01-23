@@ -17,12 +17,15 @@ import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.
 import {SymbioticMiddlewareV1} from "../../src/contracts/SymbioticMiddlewareV1.sol";
 import {EigenLayerMiddlewareV1} from "../../src/contracts/EigenLayerMiddlewareV1.sol";
 import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
-import {IRestakingMiddlewareV1} from "../../src/interfaces/IRestakingMiddlewareV1.sol";
 
 /// @notice Deploys the OperatorsRegistryV1, SymbioticMiddlewareV1 and EigenLayerMiddlewareV1 contracts,
 /// and links them by setting the restaking middlewares in the registry.
 contract DeployRegistry is Script {
     uint48 EPOCH_DURATION = 1 days;
+
+    // This is the address of the Safe multisig that controls the network
+    // and will be the admin too.
+    address ADMIN = 0xA42ec46F2c9DC671a72218E145CC13dc119fB722;
 
     OperatorsRegistryV1 registry;
 
@@ -30,28 +33,23 @@ contract DeployRegistry is Script {
     string symbioticMiddlewareName = "SymbioticMiddlewareV1";
     string eigenLayerMiddlewareName = "EigenLayerMiddlewareV1";
 
-    // =============== Symbiotic Holesky Deployments ================== //
-    IRegistry vaultRegistry = IRegistry(0x407A039D94948484D356eFB765b3c74382A050B4);
-    IRegistry operatorRegistry = IRegistry(0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548);
-    IOptInService operatorNetOptin = IOptInService(0x58973d16FFA900D11fC22e5e2B6840d9f7e13401);
+    // =============== Symbiotic Mainnet Deployments ================== //
+    IRegistry vaultRegistry = IRegistry(0xAEb6bdd95c502390db8f52c8909F703E9Af6a346);
+    IRegistry operatorRegistry = IRegistry(0xAd817a6Bc954F678451A71363f04150FDD81Af9F);
+    IOptInService operatorNetOptin = IOptInService(0x7133415b33B438843D581013f98A08704316633c);
 
-    // =============== EigenLayer Holesky Deployments ================== //
-    IAllocationManager allocationManager = IAllocationManager(0x78469728304326CBc65f8f95FA756B0B73164462);
-    IDelegationManager delegationManager = IDelegationManager(0xA44151489861Fe9e3055d95adC98FbD462B948e7);
-    IStrategyManager strategyManager = IStrategyManager(0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6);
-    IAVSDirectory avsDirectory = IAVSDirectory(0x055733000064333CaDDbC92763c58BF0192fFeBf);
+    // =============== EigenLayer Mainnet Deployments ================== //
+    IDelegationManager delegationManager = IDelegationManager(0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A);
+    IStrategyManager stategyManager = IStrategyManager(0x858646372CC42E1A627fcE94aa7A7033e7CF075A);
+    IAVSDirectory avsDirectory = IAVSDirectory(0x135DDa560e946695d6f155dACaFC6f1F25C1F5AF);
 
     function run() public {
-        // Admin == network
-        address admin = msg.sender;
-        address network = admin;
-
-        vm.startBroadcast(admin);
+        vm.startBroadcast();
 
         Options memory opts;
         opts.unsafeSkipAllChecks = true;
 
-        bytes memory initParams = abi.encodeCall(OperatorsRegistryV1.initialize, (admin, EPOCH_DURATION));
+        bytes memory initParams = abi.encodeCall(OperatorsRegistryV1.initialize, (ADMIN, EPOCH_DURATION));
 
         // address middleware = Upgrades.deployUUPSProxy("SymbioticMiddlewareV1", initParams, opts);
         address operatorsRegistry = Upgrades.deployUUPSProxy(registryName, initParams, opts);
@@ -61,41 +59,41 @@ contract DeployRegistry is Script {
 
         initParams = abi.encodeCall(
             SymbioticMiddlewareV1.initialize,
-            (admin, network, registry, vaultRegistry, operatorRegistry, operatorNetOptin)
+            (ADMIN, ADMIN, registry, vaultRegistry, operatorRegistry, operatorNetOptin)
         );
 
         address symbioticMiddleware = Upgrades.deployUUPSProxy(symbioticMiddlewareName, initParams, opts);
         console.log("Deployed %s at %s", symbioticMiddlewareName, symbioticMiddleware);
 
-        registry.updateRestakingMiddleware("SYMBIOTIC", IRestakingMiddlewareV1(symbioticMiddleware));
-
         initParams = abi.encodeCall(
             EigenLayerMiddlewareV1.initialize,
-            (admin, registry, avsDirectory, allocationManager, delegationManager, strategyManager)
+            (
+                ADMIN,
+                registry,
+                avsDirectory,
+                // Doesn't exist yet on mainnet
+                IAllocationManager(address(0)),
+                delegationManager,
+                stategyManager
+            )
         );
 
         address eigenLayerMiddleware = Upgrades.deployUUPSProxy(eigenLayerMiddlewareName, initParams, opts);
         console.log("Deployed %s at %s", eigenLayerMiddlewareName, eigenLayerMiddleware);
 
-        registry.updateRestakingMiddleware("EIGENLAYER", IRestakingMiddlewareV1(eigenLayerMiddleware));
+        // ================ EigenLayer Post-Deploy Steps ================ //
+        // These steps need to be undertaken with the ADMIN Safe.
+        //
+        // 1. updateRestakingMiddleware on OperatorsRegistry with EIGENLAYER
+        // 2. Initialize AVS with AVS directory: updateAVSMetadataURI
+        // 3. Whitelist strategies
 
-        postDeployEigenLayer(EigenLayerMiddlewareV1(eigenLayerMiddleware));
+        // ================ Symbiotic Post-Deploy Steps ================ //
+        // These steps need to be undertaken with the ADMIN Safe.
+        //
+        // 1. updateRestakingMiddleware on OperatorsRegistry with SYMBIOTIC
+        // 2. Whitelist vaults
 
         vm.stopBroadcast();
     }
-
-    function postDeployEigenLayer(
-        EigenLayerMiddlewareV1 middleware
-    ) public {
-        // 1. Whitelist strategies
-
-        // 2. Create operator sets
-
-        // 3. Initialize AVS wit AVS directory
-        middleware.updateAVSMetadataURI("TODO", "TODO");
-    }
-
-    function postDeploySymbiotic(
-        SymbioticMiddlewareV1 middleware
-    ) public {}
 }

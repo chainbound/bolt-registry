@@ -17,7 +17,7 @@ import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.
 import {IAVSRegistrar} from "@eigenlayer/src/contracts/interfaces/IAVSRegistrar.sol";
 import {IStrategy} from "@eigenlayer/src/contracts/interfaces/IStrategy.sol";
 
-import {IBoltRestakingMiddlewareV1} from "../interfaces/IBoltRestakingMiddlewareV1.sol";
+import {IRestakingMiddlewareV1} from "../interfaces/IRestakingMiddlewareV1.sol";
 import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
 
 /**
@@ -26,12 +26,7 @@ import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
  * @notice This contract is responsible for interacting with the EigenLayer restaking protocol contracts. It serves
  *         as AVS contract and implements the IAVSRegistrar interface as well.
  */
-contract BoltEigenLayerMiddlewareV1 is
-    OwnableUpgradeable,
-    UUPSUpgradeable,
-    IAVSRegistrar,
-    IBoltRestakingMiddlewareV1
-{
+contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegistrar, IRestakingMiddlewareV1 {
     using PauseableEnumerableSet for PauseableEnumerableSet.AddressSet;
 
     /// @notice Address of the EigenLayer AVS Directory contract.
@@ -105,11 +100,11 @@ contract BoltEigenLayerMiddlewareV1 is
     /// @param _operatorsRegistry The address of the Operators Registry contract
     function initialize(
         address owner,
+        IOperatorsRegistryV1 _operatorsRegistry,
         IAVSDirectory _avsDirectory,
         IAllocationManager _eigenlayerAllocationManager,
         IDelegationManager _eigenlayerDelegationManager,
-        IStrategyManager _eigenlayerStrategyManager,
-        IOperatorsRegistryV1 _operatorsRegistry
+        IStrategyManager _eigenlayerStrategyManager
     ) public initializer {
         __Ownable_init(owner);
 

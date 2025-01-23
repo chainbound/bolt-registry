@@ -3,11 +3,12 @@ pragma solidity ^0.8.27;
 
 import {Test, console} from "forge-std/Test.sol";
 
-import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
-import {IOperatorsRegistryV1} from "../../src/holesky/interfaces/IOperatorsRegistryV1.sol";
-import {BoltSymbioticMiddlewareV1} from "../../src/holesky/contracts/BoltSymbioticMiddlewareV1.sol";
+import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
+import {IOperatorsRegistryV1} from "../../src/interfaces/IOperatorsRegistryV1.sol";
+import {SymbioticMiddlewareV1} from "../../src/contracts/SymbioticMiddlewareV1.sol";
 
 import {IOperatorRegistry} from "@symbiotic/core/interfaces/IOperatorRegistry.sol";
+import {IRegistry} from "@symbiotic/core/interfaces/common/IRegistry.sol";
 import {IOptInService} from "@symbiotic/core/interfaces/service/IOptInService.sol";
 import {IVaultFactory} from "@symbiotic/core/interfaces/IVaultFactory.sol";
 import {IVault} from "@symbiotic/core/interfaces/vault/IVault.sol";
@@ -26,7 +27,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
     uint48 EPOCH_DURATION = 1 days;
 
     OperatorsRegistryV1 registry;
-    BoltSymbioticMiddlewareV1 middleware;
+    SymbioticMiddlewareV1 middleware;
 
     IVault wstEthVault = IVault(0xd88dDf98fE4d161a66FB836bee4Ca469eb0E4a75);
     IERC20 wstEth = IERC20(0x8d09a4502Cc8Cf1547aD300E066060D043f6982D);
@@ -37,10 +38,10 @@ contract SymbioticMiddlewareHoleskyTest is Test {
 
     address vaultAdmin = 0xe8616DEcea16b5216e805B0b8caf7784de7570E7;
     address networkMiddlewareService = 0x62a1ddfD86b4c1636759d9286D3A0EC722D086e3;
-    address vaultRegistry = 0x407A039D94948484D356eFB765b3c74382A050B4;
-    address vaultOptinService = 0x95CC0a052ae33941877c9619835A233D21D57351;
-    address operatorRegistry = 0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548;
-    address operatorNetOptin = 0x58973d16FFA900D11fC22e5e2B6840d9f7e13401;
+    IRegistry vaultRegistry = IRegistry(0x407A039D94948484D356eFB765b3c74382A050B4);
+    IOptInService vaultOptinService = IOptInService(0x95CC0a052ae33941877c9619835A233D21D57351);
+    IRegistry operatorRegistry = IRegistry(0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548);
+    IOptInService operatorNetOptin = IOptInService(0x58973d16FFA900D11fC22e5e2B6840d9f7e13401);
 
     function setUp() public {
         vm.createSelectFork("https://geth-holesky.bolt.chainbound.io");
@@ -55,7 +56,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
         registry = new OperatorsRegistryV1();
         registry.initialize(admin, EPOCH_DURATION);
 
-        middleware = new BoltSymbioticMiddlewareV1();
+        middleware = new SymbioticMiddlewareV1();
         // Set the restaking middleware
         registry.updateRestakingMiddleware("SYMBIOTIC", middleware);
 
@@ -69,7 +70,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
 
         INetworkMiddlewareService(networkMiddlewareService).setMiddleware(address(middleware));
 
-        middleware.initialize(admin, network, address(registry), vaultRegistry, operatorRegistry, operatorNetOptin);
+        middleware.initialize(admin, network, registry, vaultRegistry, operatorRegistry, operatorNetOptin);
 
         vm.stopPrank();
     }
@@ -114,7 +115,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
     function _registerOperatorRoutine() public {
         vm.startPrank(operator);
 
-        IOperatorRegistry(operatorRegistry).registerOperator();
+        IOperatorRegistry(address(operatorRegistry)).registerOperator();
         IOptInService(operatorNetOptin).optIn(network);
 
         IOptInService(vaultOptinService).optIn(address(wstEthVault));
@@ -136,7 +137,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
     function testRegisterOperatorNoCollateral() public {
         vm.startPrank(operator);
         // Symbiotic registration
-        IOperatorRegistry(operatorRegistry).registerOperator();
+        IOperatorRegistry(address(operatorRegistry)).registerOperator();
         IOptInService(operatorNetOptin).optIn(network);
 
         // Bolt registration
@@ -159,7 +160,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
     function testDeregisterOperator() public {
         vm.startPrank(operator);
         // Symbiotic registration
-        IOperatorRegistry(operatorRegistry).registerOperator();
+        IOperatorRegistry(address(operatorRegistry)).registerOperator();
         IOptInService(operatorNetOptin).optIn(network);
 
         // Bolt registration
@@ -193,7 +194,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
     function testCleanup() public {
         vm.startPrank(operator);
         // Symbiotic registration
-        IOperatorRegistry(operatorRegistry).registerOperator();
+        IOperatorRegistry(address(operatorRegistry)).registerOperator();
         IOptInService(operatorNetOptin).optIn(network);
 
         // Bolt registration
@@ -221,7 +222,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
         // Symbiotic registration
 
         // Bolt registration
-        vm.expectRevert(BoltSymbioticMiddlewareV1.NotVault.selector);
+        vm.expectRevert(SymbioticMiddlewareV1.NotVault.selector);
         middleware.whitelistVault(address(0));
 
         middleware.whitelistVault(address(wstEthVault));

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import {IBoltRestakingMiddlewareV1} from "./IBoltRestakingMiddlewareV1.sol";
+import {IRestakingMiddlewareV1} from "./IRestakingMiddlewareV1.sol";
 
 /// @title IOperatorsRegistryV1
 /// @notice An interface for the OperatorsRegistryV1 contract
@@ -42,10 +42,10 @@ interface IOperatorsRegistryV1 {
     function EPOCH_DURATION() external view returns (uint48);
 
     /// @notice Returns the address of the EigenLayer restaking middleware
-    function EIGENLAYER_RESTAKING_MIDDLEWARE() external view returns (IBoltRestakingMiddlewareV1);
+    function EIGENLAYER_RESTAKING_MIDDLEWARE() external view returns (IRestakingMiddlewareV1);
 
     /// @notice Returns the address of the Symbiotic restaking middleware
-    function SYMBIOTIC_RESTAKING_MIDDLEWARE() external view returns (IBoltRestakingMiddlewareV1);
+    function SYMBIOTIC_RESTAKING_MIDDLEWARE() external view returns (IRestakingMiddlewareV1);
 
     /// @notice Register an operator in the registry
     /// @param signer The address of the operator

@@ -8,7 +8,7 @@ import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
 import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
-import {IBoltRestakingMiddlewareV1} from "../interfaces/IBoltRestakingMiddlewareV1.sol";
+import {IRestakingMiddlewareV1} from "../interfaces/IRestakingMiddlewareV1.sol";
 
 /// @title OperatorsRegistryV1
 /// @notice A smart contract to store and manage Bolt operators
@@ -28,10 +28,10 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     mapping(address => Operator) public operators;
 
     /// @notice the address of the EigenLayer restaking middleware
-    IBoltRestakingMiddlewareV1 public EIGENLAYER_RESTAKING_MIDDLEWARE;
+    IRestakingMiddlewareV1 public EIGENLAYER_RESTAKING_MIDDLEWARE;
 
     /// @notice The address of the Symbiotic restaking middleware
-    IBoltRestakingMiddlewareV1 public SYMBIOTIC_RESTAKING_MIDDLEWARE;
+    IRestakingMiddlewareV1 public SYMBIOTIC_RESTAKING_MIDDLEWARE;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -260,7 +260,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     /// @param newMiddleware The address of the new restaking middleware
     function updateRestakingMiddleware(
         string calldata restakingProtocol,
-        IBoltRestakingMiddlewareV1 newMiddleware
+        IRestakingMiddlewareV1 newMiddleware
     ) public onlyOwner {
         require(address(newMiddleware) != address(0), InvalidMiddleware("Middleware address cannot be 0"));
 

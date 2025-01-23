@@ -3,12 +3,13 @@ pragma solidity ^0.8.27;
 
 import {Test, console} from "forge-std/Test.sol";
 
-import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
-import {IOperatorsRegistryV1} from "../../src/holesky/interfaces/IOperatorsRegistryV1.sol";
-import {BoltSymbioticMiddlewareV1} from "../../src/holesky/contracts/BoltSymbioticMiddlewareV1.sol";
+import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
+import {IOperatorsRegistryV1} from "../../src/interfaces/IOperatorsRegistryV1.sol";
+import {SymbioticMiddlewareV1} from "../../src/contracts/SymbioticMiddlewareV1.sol";
 
 import {IOperatorRegistry} from "@symbiotic/core/interfaces/IOperatorRegistry.sol";
 import {IOptInService} from "@symbiotic/core/interfaces/service/IOptInService.sol";
+import {IRegistry} from "@symbiotic/core/interfaces/common/IRegistry.sol";
 import {IVaultFactory} from "@symbiotic/core/interfaces/IVaultFactory.sol";
 import {IVault} from "@symbiotic/core/interfaces/vault/IVault.sol";
 import {IVaultStorage} from "@symbiotic/core/interfaces/vault/IVaultStorage.sol";
@@ -27,7 +28,7 @@ contract SymbioticMiddlewareMainnetTest is Test {
     uint48 EPOCH_DURATION = 1 days;
 
     OperatorsRegistryV1 registry;
-    BoltSymbioticMiddlewareV1 middleware;
+    SymbioticMiddlewareV1 middleware;
 
     IVault wstEthVault = IVault(0xfab8c5483a829f8D92c7e5eCbac586b07c1243Da);
     IERC20 wstEth = IERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
@@ -42,10 +43,10 @@ contract SymbioticMiddlewareMainnetTest is Test {
 
     // https://symbioticfi.notion.site/Mainnet-Deployment-Contract-Addresses-17581c079c178051be5ef6cf3cb65288
     address networkMiddlewareService = 0xD7dC9B366c027743D90761F71858BCa83C6899Ad;
-    address vaultRegistry = 0xAEb6bdd95c502390db8f52c8909F703E9Af6a346;
     address vaultOptinService = 0xb361894bC06cbBA7Ea8098BF0e32EB1906A5F891;
-    address operatorRegistry = 0xAd817a6Bc954F678451A71363f04150FDD81Af9F;
-    address operatorNetOptin = 0x7133415b33B438843D581013f98A08704316633c;
+    IRegistry vaultRegistry = IRegistry(0xAEb6bdd95c502390db8f52c8909F703E9Af6a346);
+    IRegistry operatorRegistry = IRegistry(0xAd817a6Bc954F678451A71363f04150FDD81Af9F);
+    IOptInService operatorNetOptin = IOptInService(0x7133415b33B438843D581013f98A08704316633c);
 
     function setUp() public {
         vm.createSelectFork("https://geth-mainnet.bolt.chainbound.io");
@@ -59,8 +60,8 @@ contract SymbioticMiddlewareMainnetTest is Test {
         registry = new OperatorsRegistryV1();
         registry.initialize(admin, EPOCH_DURATION);
 
-        middleware = new BoltSymbioticMiddlewareV1();
-        middleware.initialize(admin, network, address(registry), vaultRegistry, operatorRegistry, operatorNetOptin);
+        middleware = new SymbioticMiddlewareV1();
+        middleware.initialize(admin, network, registry, vaultRegistry, operatorRegistry, operatorNetOptin);
 
         // Set the restaking middleware
         registry.updateRestakingMiddleware("SYMBIOTIC", middleware);
@@ -239,7 +240,7 @@ contract SymbioticMiddlewareMainnetTest is Test {
         // Symbiotic registration
 
         // Bolt registration
-        vm.expectRevert(BoltSymbioticMiddlewareV1.NotVault.selector);
+        vm.expectRevert(SymbioticMiddlewareV1.NotVault.selector);
         middleware.whitelistVault(address(0));
 
         middleware.whitelistVault(address(wstEthVault));
