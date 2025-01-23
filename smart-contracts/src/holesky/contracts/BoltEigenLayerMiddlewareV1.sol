@@ -305,7 +305,9 @@ contract BoltEigenLayerMiddlewareV1 is
     ) public onlyOwner {
         require(_strategyWhitelist.contains(strategy), UnauthorizedStrategy());
 
-        _strategyWhitelist.pause(_now(), strategy);
+        // NOTE: we use _now() - 1 to ensure that the strategy is paused in the current epoch.
+        // If we didn't do this, we would have to wait until the next epoch until the strategy was actually paused.
+        _strategyWhitelist.pause(_now() - 1, strategy);
         emit StrategyPaused(strategy);
     }
 
@@ -328,7 +330,8 @@ contract BoltEigenLayerMiddlewareV1 is
     ) public onlyOwner {
         require(_strategyWhitelist.contains(strategy), UnauthorizedStrategy());
 
-        _strategyWhitelist.unregister(_now(), OPERATORS_REGISTRY.EPOCH_DURATION(), strategy);
+        // NOTE: we use _now() - 1 to ensure that the strategy is removed in the current epoch.
+        _strategyWhitelist.unregister(_now() - 1, OPERATORS_REGISTRY.EPOCH_DURATION(), strategy);
         emit StrategyRemoved(strategy);
     }
 

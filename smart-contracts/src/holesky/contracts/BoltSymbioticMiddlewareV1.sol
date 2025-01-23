@@ -262,7 +262,8 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
     function removeVault(
         address vault
     ) public onlyOwner {
-        _vaultWhitelist.unregister(_now(), OPERATORS_REGISTRY.EPOCH_DURATION(), vault);
+        // NOTE: we use _now() - 1 to ensure that the vault is removed in the current epoch.
+        _vaultWhitelist.unregister(_now() - 1, OPERATORS_REGISTRY.EPOCH_DURATION(), vault);
         emit VaultRemoved(vault);
     }
 
@@ -271,7 +272,9 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
     function pauseVault(
         address vault
     ) public onlyOwner {
-        _vaultWhitelist.pause(_now(), vault);
+        // NOTE: we use _now() - 1 to ensure that the vault is paused in the current epoch.
+        // If we didn't do this, we would have to wait until the next epoch until the vault was actually paused.
+        _vaultWhitelist.pause(_now() - 1, vault);
         emit VaultPaused(vault);
     }
 
@@ -394,7 +397,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
     }
 
     /// @notice Returns the timestamp of the current epoch.
-    /// @return timestamp The current timestamp
+    /// @return timestamp The current epoch timestamp.
     function _now() internal view returns (uint48) {
         return OPERATORS_REGISTRY.getCurrentEpochStartTimestamp();
     }

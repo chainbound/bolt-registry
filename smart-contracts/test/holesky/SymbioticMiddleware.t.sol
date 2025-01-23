@@ -232,8 +232,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
 
         middleware.pauseVault(address(wstEthVault));
         // Pausing takes a sec
-        vm.warp(block.timestamp + 1);
-        assertEq(middleware.isVaultActive(address(wstEthVault)), false);
+        assertEq(middleware.isVaultActive(address(wstEthVault)), false, "Vault should be inactive");
 
         // To remove, we need to pass the immutable period (EPOCH_DURATION)
         vm.warp(block.timestamp + registry.EPOCH_DURATION());
