@@ -159,7 +159,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
 
     // ================ OPERATOR VIEW METHODS =================== //
 
-    /// Gets the operator stake for the vault.
+    /// @notice Gets the operator stake for the vault.
     /// @param operator The address of the operator.
     /// @param collateral The address of the collateral.
     /// @return The operator stake.
@@ -168,7 +168,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         return getOperatorStakeAt(operator, collateral, OPERATORS_REGISTRY.getCurrentEpochStartTimestamp());
     }
 
-    /// Gets the operator stake for the vault at a specific timestamp.
+    /// @notice Gets the operator stake for the vault at a specific timestamp.
     /// @param operator The address of the operator.
     /// @param collateral The address of the collateral.
     /// @param timestamp The timestamp to get the stake at.
@@ -202,6 +202,10 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         return IBaseDelegator(IVault(vault).delegator()).stakeAt(networkId, operator, timestamp, "");
     }
 
+    /// @notice Gets the operator collaterals, as a tuple of arrays.
+    /// @param operator The address of the operator.
+    /// @return The operator collaterals and amounts, as a tuple of arrays with a
+    /// shared index.
     function getOperatorCollaterals(
         address operator
     ) public view returns (address[] memory, uint256[] memory) {
@@ -231,7 +235,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
 
     // ================ VAULTS ===================== //
 
-    /// Whitelists a vault for the network.
+    /// @notice Whitelists a vault for the network.
     /// @param vault The address of the vault
     function whitelistVault(
         address vault
@@ -245,7 +249,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         emit VaultWhitelisted(vault);
     }
 
-    /// Removes a whitelisted vault from the network.
+    /// @notice Removes a whitelisted vault from the network.
     /// @param vault The address of the vault
     function removeVault(
         address vault
@@ -254,7 +258,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         emit VaultRemoved(vault);
     }
 
-    /// Pause a vault across the network (whitelist, operator-specific, and shared).
+    /// @notice Pause a vault across the network (whitelist, operator-specific, and shared).
     /// @param vault The address of the vault
     function pauseVault(
         address vault
@@ -263,7 +267,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         emit VaultPaused(vault);
     }
 
-    /// Unpause a vault
+    /// @notice Unpause a vault
     /// @param vault The address of the vault
     function unpauseVault(
         address vault
@@ -272,20 +276,22 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         emit VaultUnpaused(vault);
     }
 
-    /// Returns the total number of whitelisted vaults.
+    /// @notice Returns the total number of whitelisted vaults.
+    /// @return The total number of whitelisted vaults.
     function vaultWhitelistLength() public view returns (uint256) {
         return _vaultWhitelist.length();
     }
 
-    /// Returns whether the vault is currently active.
+    /// @notice Returns whether the vault is currently active.
     /// @param vault The address of the vault
+    /// @return True if the vault is active, false otherwise.
     function isVaultActive(
         address vault
     ) public view returns (bool) {
         return _vaultWhitelist.wasActiveAt(_now(), vault);
     }
 
-    /// Validates if a vault is properly initialized and registered
+    /// @notice Validates if a vault is properly initialized and registered
     /// @param vault The vault address to validate
     /// @dev Adapted from https://github.com/symbioticfi/middleware-sdk/blob/68334572da818cc547aca8e729321e98df97a2a8/src/managers/VaultManager.sol
     function _validateVault(
@@ -317,7 +323,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         // }
     }
 
-    /// Validates if a vault has an operator-specific delegator type (OPERATOR_SPECIFIC or OPERATOR_NETWORK_SPECIFIC)
+    /// @notice Validates if a vault has an operator-specific delegator type (OPERATOR_SPECIFIC or OPERATOR_NETWORK_SPECIFIC)
     /// @param operator The operator address
     /// @param vault The vault address
     function _validateOperatorVault(address operator, address vault) internal view {
@@ -335,7 +341,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
 
     // ========= HELPER FUNCTIONS =========
 
-    /// Check if a map entry was active at a given timestamp.
+    /// @notice Check if a map entry was active at a given timestamp.
     /// @param enabledTime The enabled time of the map entry.
     /// @param disabledTime The disabled time of the map entry.
     /// @param timestamp The timestamp to check the map entry status at.
@@ -344,7 +350,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
     }
 
-    /// Returns the current timestamp
+    /// @notice Returns the current timestamp
     /// @return timestamp The current timestamp
     function _now() internal view returns (uint48) {
         return Time.timestamp();
