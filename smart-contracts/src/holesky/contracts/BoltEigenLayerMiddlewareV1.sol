@@ -105,11 +105,11 @@ contract BoltEigenLayerMiddlewareV1 is
     /// @param _operatorsRegistry The address of the Operators Registry contract
     function initialize(
         address owner,
+        IOperatorsRegistryV1 _operatorsRegistry,
         IAVSDirectory _avsDirectory,
         IAllocationManager _eigenlayerAllocationManager,
         IDelegationManager _eigenlayerDelegationManager,
-        IStrategyManager _eigenlayerStrategyManager,
-        IOperatorsRegistryV1 _operatorsRegistry
+        IStrategyManager _eigenlayerStrategyManager
     ) public initializer {
         __Ownable_init(owner);
 

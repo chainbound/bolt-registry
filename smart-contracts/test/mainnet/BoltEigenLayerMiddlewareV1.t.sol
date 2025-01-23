@@ -71,11 +71,11 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         middleware = new BoltEigenLayerMiddlewareV1();
         middleware.initialize(
             admin,
+            registry,
             mainnetAVSDirectory,
             IAllocationManager(address(0)),
             mainnetDelegationManager,
-            mainnetStrategyManager,
-            registry
+            mainnetStrategyManager
         );
 
         // 1. Whitelist the strategies in the middleware

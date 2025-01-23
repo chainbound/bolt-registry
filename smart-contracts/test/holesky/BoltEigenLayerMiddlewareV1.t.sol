@@ -64,11 +64,11 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         middleware = new BoltEigenLayerMiddlewareV1();
         middleware.initialize(
             admin,
+            registry,
             holeskyAVSDirectory,
             holeskyAllocationManager,
             holeskyDelegationManager,
-            holeskyStrategyManager,
-            registry
+            holeskyStrategyManager
         );
 
         // 1. Whitelist the strategies in the middleware
