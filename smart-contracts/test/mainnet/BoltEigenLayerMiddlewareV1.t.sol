@@ -147,7 +147,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
 
         vm.warp(block.timestamp + 1 days);
 
-        (OperatorsLibV1.Operator memory opData, bool isActive) = registry.getOperator(signer);
+        (IOperatorsRegistryV1.Operator memory opData, bool isActive) = registry.getOperator(signer);
         assertEq(opData.signer, signer);
         assertEq(opData.rpcEndpoint, rpcEndpoint);
         assertEq(opData.extraData, extraData);
