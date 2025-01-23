@@ -149,7 +149,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
 
         assert(registry.isOperator(operator));
 
-        // Activation requires a second to have passed
+        // Activation requires an epoch to have passed
         skip(EPOCH_DURATION);
         assert(registry.isActiveOperator(operator));
 
