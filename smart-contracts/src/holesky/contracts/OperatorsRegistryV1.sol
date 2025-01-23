@@ -160,6 +160,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     /// @dev Only restaking middleware contracts can call this function
     function updateOperatorRpcEndpoint(address signer, string memory newRpcEndpoint) external onlyMiddleware {
         require(_operatorAddresses.contains(signer), UnknownOperator());
+        require(bytes(newRpcEndpoint).length > 0, InvalidRpc());
 
         operators[signer].rpcEndpoint = newRpcEndpoint;
     }
@@ -215,8 +216,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         require(_operatorAddresses.contains(signer), UnknownOperator());
 
         operator = operators[signer];
-
-        return (operator, _operatorAddresses.wasActiveAt(Time.timestamp(), signer));
+        isActive = _operatorAddresses.wasActiveAt(Time.timestamp(), signer);
     }
 
     /// @notice Returns true if the given address is an operator in the registry.
