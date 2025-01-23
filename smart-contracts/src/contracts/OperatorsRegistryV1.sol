@@ -124,6 +124,8 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     function pauseOperator(
         address signer
     ) external onlyMiddleware {
+        require(_operatorAddresses.contains(signer), UnknownOperator());
+
         // NOTE: we use _now() - 1 to ensure that the operator is paused in the current epoch.
         // If we didn't do this, we would have to wait until the next epoch until the operator was actually paused.
         _operatorAddresses.pause(_now() - 1, signer);
@@ -137,6 +139,8 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     function unpauseOperator(
         address signer
     ) external onlyMiddleware {
+        require(_operatorAddresses.contains(signer), UnknownOperator());
+
         _operatorAddresses.unpause(_now(), EPOCH_DURATION, signer);
         emit OperatorUnpaused(signer, msg.sender);
     }
