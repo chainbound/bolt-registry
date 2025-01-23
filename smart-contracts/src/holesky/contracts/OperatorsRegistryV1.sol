@@ -74,8 +74,8 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     function initialize(address owner, uint48 epochDuration) public initializer {
         __Ownable_init(owner);
 
-        START_TIMESTAMP = _now();
         EPOCH_DURATION = epochDuration;
+        START_TIMESTAMP = Time.timestamp();
     }
 
     /// @notice Upgrade the contract
