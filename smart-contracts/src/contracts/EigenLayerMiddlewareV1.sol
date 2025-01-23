@@ -241,6 +241,18 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
         OPERATORS_REGISTRY.registerOperator(operator, rpcEndpoint, extraData);
     }
 
+    /// @notice Deregister an operator through the AVS Directory
+    /// @dev This function is used before the ELIP-002 (slashing) EigenLayer upgrade to deregister operators.
+    /// @dev Operators must use this function to deregister before the upgrade. After the upgrade, this will be removed.
+    function deregisterThroughAVSDirectory() public {
+        address operator = msg.sender;
+
+        require(DELEGATION_MANAGER.isOperator(msg.sender), NotOperator());
+
+        AVS_DIRECTORY.deregisterOperatorFromAVS(operator);
+        OPERATORS_REGISTRY.pauseOperator(msg.sender);
+    }
+
     // ========= AVS Registrar functions ========= //
 
     /// @notice Allows the AllocationManager to hook into the middleware to validate operator registration
