@@ -97,20 +97,4 @@ contract DeployRegistry is Script {
 
         vm.stopBroadcast();
     }
-
-    function postDeployEigenLayer(
-        BoltEigenLayerMiddlewareV1 middleware
-    ) public {
-        // 1. Whitelist strategies
-
-        // 2. Initialize AVS with AVS directory
-        middleware.updateAVSMetadataURI("TODO", "TODO");
-    }
-
-    function postDeploySymbiotic(
-        BoltSymbioticMiddlewareV1 middleware
-    ) public {
-        // 1. Whitelist vaults
-        // No vaults yet. This will need to be done by the admin.
-    }
 }
