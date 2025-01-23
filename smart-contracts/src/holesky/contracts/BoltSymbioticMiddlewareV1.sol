@@ -21,18 +21,15 @@ import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/Pausea
 import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
 import {IBoltRestakingMiddlewareV1} from "../interfaces/IBoltRestakingMiddlewareV1.sol";
 
-/**
- * @title SymbioticMiddlewareV1
- * @author Chainbound Developers <dev@chainbound.io>
- * @notice This contract is responsible for interacting with the Symbiotic restaking protocol contracts. It is both
- *         the middleware and the actual network contract, because it self-registers with the network registry.
- *         Responsibilities include: operator and vault management, stake aggregation across multiple vaults, and in the
- *         future: slashing & rewards.
- * @dev This contract is based on the middleware-SDK.
- *
- * For more information on extensions, see <https://docs.symbiotic.fi/middleware-sdk/extensions>.
- * All public view functions are implemented in the `BaseMiddlewareReader`: <https://docs.symbiotic.fi/middleware-sdk/api-reference/middleware/BaseMiddlewareReader>
- */
+/// @title SymbioticMiddlewareV1
+/// @author Chainbound Developers <dev@chainbound.io>
+/// @notice This contract is responsible for interacting with the Symbiotic restaking protocol contracts.
+///         Responsibilities include: operator and vault management, stake aggregation across multiple vaults, and in the
+///         future: slashing & rewards.
+/// @dev This contract is based on the middleware-SDK.
+///
+/// For more information on extensions, see <https://docs.symbiotic.fi/middleware-sdk/extensions>.
+/// All public view functions are implemented in the `BaseMiddlewareReader`: <https://docs.symbiotic.fi/middleware-sdk/api-reference/middleware/BaseMiddlewareReader>
 contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgradeable, UUPSUpgradeable {
     using Subnetwork for address;
     using PauseableEnumerableSet for PauseableEnumerableSet.AddressSet;
@@ -66,14 +63,12 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
     /// @notice The set of whitelisted vaults for the network.
     PauseableEnumerableSet.AddressSet private _vaultWhitelist;
 
-    /**
-     * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shift_initializeNetworkage in the inheritance chain.
-     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-     * This can be validated with the Openzeppelin Foundry Upgrades toolkit.
-     *
-     * Total storage slots: 50
-     */
+    /// @dev This empty reserved space is put in place to allow future versions to add new
+    /// variables without shift_initializeNetworkage in the inheritance chain.
+    /// See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+    /// This can be validated with the Openzeppelin Foundry Upgrades toolkit.
+    ///
+    /// Total storage slots: 50
     uint256[42] private __gap;
 
     /// @notice The vault delegator types.
@@ -106,16 +101,14 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
 
     /// =================== MODIFIERS =================== //
 
-    /**
-     * @notice Constructor for initializing the SymbioticMiddlewareV1 contract
-     * @param owner The address of the owner
-     * @param network The address of the network
-     * @param vaultRegistry The address of the vault registry
-     * @param operatorRegistry The address of the operator registry
-     * @param operatorNetOptin The address of the operator network opt-in service
-     * @dev We put all of the contract dependencies in the constructor to make it easier to (re-)deploy
-     *      when dependencies are upgraded.
-     */
+    /// @notice Constructor for initializing the SymbioticMiddlewareV1 contract
+    /// @param owner The address of the owner
+    /// @param network The address of the network
+    /// @param vaultRegistry The address of the vault registry
+    /// @param operatorRegistry The address of the operator registry
+    /// @param operatorNetOptin The address of the operator network opt-in service
+    /// @dev We put all of the contract dependencies in the constructor to make it easier to (re-)deploy
+    ///      when dependencies are upgraded.
     function initialize(
         address owner,
         address network,
@@ -139,13 +132,8 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
     ) internal override onlyOwner {}
 
     // ================ OPERATORS ===================== //
-    //
-    // These functions are only callable by the bolt registry.
-    // All external operator management is done through the bolt registry.
 
-    /**
-     * @notice Register an operator in the registry.
-     */
+    /// @notice Register an operator in the registry.
     function registerOperator(string calldata rpcEndpoint, string calldata extraData) public {
         require(IRegistry(OPERATOR_REGISTRY).isEntity(msg.sender), NotOperator());
 
@@ -154,19 +142,15 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         OPERATORS_REGISTRY.registerOperator(msg.sender, rpcEndpoint, extraData);
     }
 
-    /**
-     * @notice Deregister an operator from the registry.
-     */
+    /// @notice Deregister an operator from the registry.
     function deregisterOperator() public {
         OPERATORS_REGISTRY.pauseOperator(msg.sender);
         // TODO(V3): in the future we may not want to remove the vaults immediately, in case
         // of a pending penalty that the operator is trying to avoid.
     }
 
-    /**
-     * @notice Update your RPC endpoint as an operator.
-     * @param rpcEndpoint The new rpc endpoint.
-     */
+    /// @notice Update your RPC endpoint as an operator.
+    /// @param rpcEndpoint The new rpc endpoint.
     function updateOperatorRpcEndpoint(
         string calldata rpcEndpoint
     ) public {
@@ -175,24 +159,20 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
 
     // ================ OPERATOR VIEW METHODS =================== //
 
-    /**
-     * @notice Gets the operator stake for the vault.
-     * @param operator The address of the operator.
-     * @param collateral The address of the collateral.
-     * @return The operator stake.
-     */
+    /// Gets the operator stake for the vault.
+    /// @param operator The address of the operator.
+    /// @param collateral The address of the collateral.
+    /// @return The operator stake.
     function getOperatorStake(address operator, address collateral) public view returns (uint256) {
         // TODO(V2): only do this for active operators & vaults?
         return getOperatorStakeAt(operator, collateral, OPERATORS_REGISTRY.getCurrentEpochStartTimestamp());
     }
 
-    /**
-     * @notice Gets the operator stake for the vault at a specific timestamp.
-     * @param operator The address of the operator.
-     * @param collateral The address of the collateral.
-     * @param timestamp The timestamp to get the stake at.
-     * @return The operator stake.
-     */
+    /// Gets the operator stake for the vault at a specific timestamp.
+    /// @param operator The address of the operator.
+    /// @param collateral The address of the collateral.
+    /// @param timestamp The timestamp to get the stake at.
+    /// @return The operator stake.
     function getOperatorStakeAt(address operator, address collateral, uint48 timestamp) public view returns (uint256) {
         // TODO(V2): check if vault and operator are registered, associated & active
         // Distinguish between shared vaults and operator vaults
@@ -251,10 +231,8 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
 
     // ================ VAULTS ===================== //
 
-    /**
-     * @notice Whitelists a vault for the network.
-     * @param vault The address of the vault
-     */
+    /// Whitelists a vault for the network.
+    /// @param vault The address of the vault
     function whitelistVault(
         address vault
     ) public onlyOwner {
@@ -267,10 +245,8 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         emit VaultWhitelisted(vault);
     }
 
-    /**
-     * @notice Removes a whitelisted vault from the network.
-     * @param vault The address of the vault
-     */
+    /// Removes a whitelisted vault from the network.
+    /// @param vault The address of the vault
     function removeVault(
         address vault
     ) public onlyOwner {
@@ -278,10 +254,8 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         emit VaultRemoved(vault);
     }
 
-    /**
-     * @notice Pause a vault across the network (whitelist, operator-specific, and shared).
-     * @param vault The address of the vault
-     */
+    /// Pause a vault across the network (whitelist, operator-specific, and shared).
+    /// @param vault The address of the vault
     function pauseVault(
         address vault
     ) public onlyOwner {
@@ -289,10 +263,8 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         emit VaultPaused(vault);
     }
 
-    /**
-     * @notice Unpause a vault
-     * @param vault The address of the vault
-     */
+    /// Unpause a vault
+    /// @param vault The address of the vault
     function unpauseVault(
         address vault
     ) public onlyOwner {
@@ -300,28 +272,22 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         emit VaultUnpaused(vault);
     }
 
-    /**
-     * @notice Returns the total number of whitelisted vaults.
-     */
+    /// Returns the total number of whitelisted vaults.
     function vaultWhitelistLength() public view returns (uint256) {
         return _vaultWhitelist.length();
     }
 
-    /**
-     * @notice Returns whether the vault is currently active.
-     * @param vault The address of the vault
-     */
+    /// Returns whether the vault is currently active.
+    /// @param vault The address of the vault
     function isVaultActive(
         address vault
     ) public view returns (bool) {
         return _vaultWhitelist.wasActiveAt(_now(), vault);
     }
 
-    /**
-     * @notice Validates if a vault is properly initialized and registered
-     * @param vault The vault address to validate
-     * @dev Adapted from https://github.com/symbioticfi/middleware-sdk/blob/68334572da818cc547aca8e729321e98df97a2a8/src/managers/VaultManager.sol
-     */
+    /// Validates if a vault is properly initialized and registered
+    /// @param vault The vault address to validate
+    /// @dev Adapted from https://github.com/symbioticfi/middleware-sdk/blob/68334572da818cc547aca8e729321e98df97a2a8/src/managers/VaultManager.sol
     function _validateVault(
         address vault
     ) private view {
@@ -351,11 +317,9 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         // }
     }
 
-    /**
-     * @notice Validates if a vault has an operator-specific delegator type (OPERATOR_SPECIFIC or OPERATOR_NETWORK_SPECIFIC)
-     * @param operator The operator address
-     * @param vault The vault address
-     */
+    /// Validates if a vault has an operator-specific delegator type (OPERATOR_SPECIFIC or OPERATOR_NETWORK_SPECIFIC)
+    /// @param operator The operator address
+    /// @param vault The vault address
     function _validateOperatorVault(address operator, address vault) internal view {
         address delegator = IVault(vault).delegator();
         uint64 delegatorType = IEntity(delegator).TYPE();
@@ -371,7 +335,7 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
 
     // ========= HELPER FUNCTIONS =========
 
-    /// @notice Check if a map entry was active at a given timestamp.
+    /// Check if a map entry was active at a given timestamp.
     /// @param enabledTime The enabled time of the map entry.
     /// @param disabledTime The disabled time of the map entry.
     /// @param timestamp The timestamp to check the map entry status at.
@@ -380,10 +344,8 @@ contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgrade
         return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
     }
 
-    /**
-     * @notice Returns the current timestamp
-     * @return timestamp The current timestamp
-     */
+    /// Returns the current timestamp
+    /// @return timestamp The current timestamp
     function _now() internal view returns (uint48) {
         return Time.timestamp();
     }
