@@ -38,10 +38,9 @@ contract DeployRegistry is Script {
     IOptInService operatorNetOptin = IOptInService(0x58973d16FFA900D11fC22e5e2B6840d9f7e13401);
 
     // =============== EigenLayer Holesky Deployments ================== //
-    IAllocationManager holeskyAllocationManager = IAllocationManager(0x78469728304326CBc65f8f95FA756B0B73164462);
-    IDelegationManager holeskyDelegationManager = IDelegationManager(0xA44151489861Fe9e3055d95adC98FbD462B948e7);
-    IStrategyManager holeskyStrategyManager = IStrategyManager(0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6);
-    IAVSDirectory holeskyAVSDirectory = IAVSDirectory(0x055733000064333CaDDbC92763c58BF0192fFeBf);
+    IDelegationManager holeskyDelegationManager = IDelegationManager(0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A);
+    IStrategyManager holeskyStrategyManager = IStrategyManager(0x858646372CC42E1A627fcE94aa7A7033e7CF075A);
+    IAVSDirectory holeskyAVSDirectory = IAVSDirectory(0x135DDa560e946695d6f155dACaFC6f1F25C1F5AF);
 
     function run() public {
         // Admin == network
@@ -78,7 +77,8 @@ contract DeployRegistry is Script {
                 admin,
                 registry,
                 holeskyAVSDirectory,
-                holeskyAllocationManager,
+                // Doesn't exist yet on mainnet
+                IAllocationManager(address(0)),
                 holeskyDelegationManager,
                 holeskyStrategyManager
             )
@@ -99,9 +99,7 @@ contract DeployRegistry is Script {
     ) public {
         // 1. Whitelist strategies
 
-        // 2. Create operator sets
-
-        // 3. Initialize AVS wit AVS directory
+        // 2. Initialize AVS wit AVS directory
         middleware.updateAVSMetadataURI("TODO", "TODO");
     }
 

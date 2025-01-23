@@ -17,7 +17,6 @@ import {OperatorSet} from "@eigenlayer/src/contracts/libraries/OperatorSetLib.so
 import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
 import {IOperatorsRegistryV1} from "../../src/holesky/interfaces/IOperatorsRegistryV1.sol";
 import {BoltEigenLayerMiddlewareV1} from "../../src/holesky/contracts/BoltEigenLayerMiddlewareV1.sol";
-import {OperatorsLibV1} from "../../src/holesky/lib/OperatorsLibV1.sol";
 
 // This is needed because the registerAsOperator function has changed in ELIP-002
 // and we need to manually call it with the pre-ELIP-002 parameters
