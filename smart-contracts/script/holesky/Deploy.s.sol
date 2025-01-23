@@ -25,8 +25,6 @@ contract DeployRegistry is Script {
     uint48 EPOCH_DURATION = 1 days;
 
     OperatorsRegistryV1 registry;
-    // BoltSymbioticMiddlewareV1 symbioticMiddleware;
-    // BoltEigenLayerMiddlewareV1 eigenLayerMiddleware;
 
     string registryName = "OperatorsRegistryV1";
     string symbioticMiddlewareName = "BoltSymbioticMiddlewareV1";
@@ -38,10 +36,10 @@ contract DeployRegistry is Script {
     IOptInService operatorNetOptin = IOptInService(0x58973d16FFA900D11fC22e5e2B6840d9f7e13401);
 
     // =============== EigenLayer Holesky Deployments ================== //
-    IAllocationManager holeskyAllocationManager = IAllocationManager(0x78469728304326CBc65f8f95FA756B0B73164462);
-    IDelegationManager holeskyDelegationManager = IDelegationManager(0xA44151489861Fe9e3055d95adC98FbD462B948e7);
-    IStrategyManager holeskyStrategyManager = IStrategyManager(0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6);
-    IAVSDirectory holeskyAVSDirectory = IAVSDirectory(0x055733000064333CaDDbC92763c58BF0192fFeBf);
+    IAllocationManager allocationManager = IAllocationManager(0x78469728304326CBc65f8f95FA756B0B73164462);
+    IDelegationManager delegationManager = IDelegationManager(0xA44151489861Fe9e3055d95adC98FbD462B948e7);
+    IStrategyManager strategyManager = IStrategyManager(0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6);
+    IAVSDirectory avsDirectory = IAVSDirectory(0x055733000064333CaDDbC92763c58BF0192fFeBf);
 
     function run() public {
         // Admin == network
@@ -50,7 +48,6 @@ contract DeployRegistry is Script {
 
         vm.startBroadcast(admin);
 
-        // TODO: Fix safe deploy, currently failing with `ASTDereferencerError` from openzeppelin
         Options memory opts;
         opts.unsafeSkipAllChecks = true;
 
@@ -74,14 +71,7 @@ contract DeployRegistry is Script {
 
         initParams = abi.encodeCall(
             BoltEigenLayerMiddlewareV1.initialize,
-            (
-                admin,
-                registry,
-                holeskyAVSDirectory,
-                holeskyAllocationManager,
-                holeskyDelegationManager,
-                holeskyStrategyManager
-            )
+            (admin, registry, avsDirectory, allocationManager, delegationManager, strategyManager)
         );
 
         address eigenLayerMiddleware = Upgrades.deployUUPSProxy(eigenLayerMiddlewareName, initParams, opts);

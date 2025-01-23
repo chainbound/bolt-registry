@@ -29,8 +29,6 @@ contract DeployRegistry is Script {
     address ADMIN = 0xA42ec46F2c9DC671a72218E145CC13dc119fB722;
 
     OperatorsRegistryV1 registry;
-    // BoltSymbioticMiddlewareV1 symbioticMiddleware;
-    // BoltEigenLayerMiddlewareV1 eigenLayerMiddleware;
 
     string registryName = "OperatorsRegistryV1";
     string symbioticMiddlewareName = "BoltSymbioticMiddlewareV1";
@@ -49,7 +47,6 @@ contract DeployRegistry is Script {
     function run() public {
         vm.startBroadcast();
 
-        // TODO: Fix safe deploy, currently failing with `ASTDereferencerError` from openzeppelin
         Options memory opts;
         opts.unsafeSkipAllChecks = true;
 
