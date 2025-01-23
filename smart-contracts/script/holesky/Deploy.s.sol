@@ -14,10 +14,10 @@ import {IDelegationManager} from "@eigenlayer/src/contracts/interfaces/IDelegati
 import {IStrategyManager} from "@eigenlayer/src/contracts/interfaces/IStrategyManager.sol";
 import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.sol";
 
-import {BoltSymbioticMiddlewareV1} from "../../src/holesky/contracts/BoltSymbioticMiddlewareV1.sol";
-import {BoltEigenLayerMiddlewareV1} from "../../src/holesky/contracts/BoltEigenLayerMiddlewareV1.sol";
-import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
-import {IBoltRestakingMiddlewareV1} from "../../src/holesky/interfaces/IBoltRestakingMiddlewareV1.sol";
+import {BoltSymbioticMiddlewareV1} from "../../src/contracts/BoltSymbioticMiddlewareV1.sol";
+import {BoltEigenLayerMiddlewareV1} from "../../src/contracts/BoltEigenLayerMiddlewareV1.sol";
+import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
+import {IBoltRestakingMiddlewareV1} from "../../src/interfaces/IBoltRestakingMiddlewareV1.sol";
 
 /// @notice Deploys the OperatorsRegistryV1, BoltSymbioticMiddlewareV1 and BoltEigenLayerMiddlewareV1 contracts,
 /// and links them by setting the restaking middlewares in the registry.

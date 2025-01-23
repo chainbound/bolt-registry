@@ -3,9 +3,9 @@ pragma solidity ^0.8.27;
 
 import {Test, console} from "forge-std/Test.sol";
 
-import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
-import {IOperatorsRegistryV1} from "../../src/holesky/interfaces/IOperatorsRegistryV1.sol";
-import {BoltSymbioticMiddlewareV1} from "../../src/holesky/contracts/BoltSymbioticMiddlewareV1.sol";
+import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
+import {IOperatorsRegistryV1} from "../../src/interfaces/IOperatorsRegistryV1.sol";
+import {BoltSymbioticMiddlewareV1} from "../../src/contracts/BoltSymbioticMiddlewareV1.sol";
 
 import {IOperatorRegistry} from "@symbiotic/core/interfaces/IOperatorRegistry.sol";
 import {IOptInService} from "@symbiotic/core/interfaces/service/IOptInService.sol";

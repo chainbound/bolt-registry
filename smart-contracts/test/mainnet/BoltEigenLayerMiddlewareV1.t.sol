@@ -14,9 +14,9 @@ import {ISignatureUtils} from "@eigenlayer/src/contracts/interfaces/ISignatureUt
 import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.sol";
 import {OperatorSet} from "@eigenlayer/src/contracts/libraries/OperatorSetLib.sol";
 
-import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
-import {IOperatorsRegistryV1} from "../../src/holesky/interfaces/IOperatorsRegistryV1.sol";
-import {BoltEigenLayerMiddlewareV1} from "../../src/holesky/contracts/BoltEigenLayerMiddlewareV1.sol";
+import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
+import {IOperatorsRegistryV1} from "../../src/interfaces/IOperatorsRegistryV1.sol";
+import {BoltEigenLayerMiddlewareV1} from "../../src/contracts/BoltEigenLayerMiddlewareV1.sol";
 
 // This is needed because the registerAsOperator function has changed in ELIP-002
 // and we need to manually call it with the pre-ELIP-002 parameters

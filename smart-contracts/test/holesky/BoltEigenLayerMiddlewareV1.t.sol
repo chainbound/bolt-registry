@@ -15,9 +15,9 @@ import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.
 import {OperatorSet} from "@eigenlayer/src/contracts/libraries/OperatorSetLib.sol";
 import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
-import {OperatorsRegistryV1} from "../../src/holesky/contracts/OperatorsRegistryV1.sol";
-import {IOperatorsRegistryV1} from "../../src/holesky/interfaces/IOperatorsRegistryV1.sol";
-import {BoltEigenLayerMiddlewareV1} from "../../src/holesky/contracts/BoltEigenLayerMiddlewareV1.sol";
+import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
+import {IOperatorsRegistryV1} from "../../src/interfaces/IOperatorsRegistryV1.sol";
+import {BoltEigenLayerMiddlewareV1} from "../../src/contracts/BoltEigenLayerMiddlewareV1.sol";
 import {IWETH} from "../util/IWETH.sol";
 
 contract BoltEigenLayerMiddlewareV1Test is Test {
