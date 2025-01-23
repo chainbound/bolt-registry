@@ -97,6 +97,7 @@ contract SymbioticMiddlewareV1 is IRestakingMiddlewareV1, OwnableUpgradeable, UU
     event VaultUnpaused(address indexed vault);
 
     /// =================== ERRORS ====================== //
+
     error NotOperator();
     error OperatorNotOptedIn();
     error OperatorNotRegistered();
