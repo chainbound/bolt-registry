@@ -4,8 +4,6 @@ pragma solidity ^0.8.27;
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
 
 import {IVault} from "@symbiotic/core/interfaces/vault/IVault.sol";
@@ -16,7 +14,6 @@ import {IBaseDelegator} from "@symbiotic/core/interfaces/delegator/IBaseDelegato
 import {IRegistry} from "@symbiotic/core/interfaces/common/IRegistry.sol";
 import {IOptInService} from "@symbiotic/core/interfaces/service/IOptInService.sol";
 import {Subnetwork} from "@symbiotic/core/contracts/libraries/Subnetwork.sol";
-import {INetworkRegistry} from "@symbiotic/core/interfaces/INetworkRegistry.sol";
 import {INetworkMiddlewareService} from "@symbiotic/core/interfaces/service/INetworkMiddlewareService.sol";
 
 import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
@@ -38,8 +35,6 @@ import {IBoltRestakingMiddlewareV1} from "../interfaces/IBoltRestakingMiddleware
  */
 contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgradeable, UUPSUpgradeable {
     using Subnetwork for address;
-    using EnumerableSet for EnumerableSet.AddressSet;
-    using EnumerableMap for EnumerableMap.AddressToAddressMap;
     using PauseableEnumerableSet for PauseableEnumerableSet.AddressSet;
 
     // ================ STORAGE ================== //
