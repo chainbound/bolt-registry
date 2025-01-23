@@ -19,7 +19,7 @@ import {INetworkMiddlewareService} from "@symbiotic/core/interfaces/service/INet
 import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
 import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
-import {IBoltRestakingMiddlewareV1} from "../interfaces/IBoltRestakingMiddlewareV1.sol";
+import {IRestakingMiddlewareV1} from "../interfaces/IRestakingMiddlewareV1.sol";
 
 /// @title SymbioticMiddlewareV1
 /// @author Chainbound Developers <dev@chainbound.io>
@@ -30,7 +30,7 @@ import {IBoltRestakingMiddlewareV1} from "../interfaces/IBoltRestakingMiddleware
 ///
 /// For more information on extensions, see <https://docs.symbiotic.fi/middleware-sdk/extensions>.
 /// All public view functions are implemented in the `BaseMiddlewareReader`: <https://docs.symbiotic.fi/middleware-sdk/api-reference/middleware/BaseMiddlewareReader>
-contract BoltSymbioticMiddlewareV1 is IBoltRestakingMiddlewareV1, OwnableUpgradeable, UUPSUpgradeable {
+contract SymbioticMiddlewareV1 is IRestakingMiddlewareV1, OwnableUpgradeable, UUPSUpgradeable {
     using Subnetwork for address;
     using PauseableEnumerableSet for PauseableEnumerableSet.AddressSet;
 

@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 
 import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
 import {IOperatorsRegistryV1} from "../../src/interfaces/IOperatorsRegistryV1.sol";
-import {BoltSymbioticMiddlewareV1} from "../../src/contracts/BoltSymbioticMiddlewareV1.sol";
+import {SymbioticMiddlewareV1} from "../../src/contracts/SymbioticMiddlewareV1.sol";
 
 import {IOperatorRegistry} from "@symbiotic/core/interfaces/IOperatorRegistry.sol";
 import {IRegistry} from "@symbiotic/core/interfaces/common/IRegistry.sol";
@@ -27,7 +27,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
     uint48 EPOCH_DURATION = 1 days;
 
     OperatorsRegistryV1 registry;
-    BoltSymbioticMiddlewareV1 middleware;
+    SymbioticMiddlewareV1 middleware;
 
     IVault wstEthVault = IVault(0xd88dDf98fE4d161a66FB836bee4Ca469eb0E4a75);
     IERC20 wstEth = IERC20(0x8d09a4502Cc8Cf1547aD300E066060D043f6982D);
@@ -56,7 +56,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
         registry = new OperatorsRegistryV1();
         registry.initialize(admin, EPOCH_DURATION);
 
-        middleware = new BoltSymbioticMiddlewareV1();
+        middleware = new SymbioticMiddlewareV1();
         // Set the restaking middleware
         registry.updateRestakingMiddleware("SYMBIOTIC", middleware);
 
@@ -222,7 +222,7 @@ contract SymbioticMiddlewareHoleskyTest is Test {
         // Symbiotic registration
 
         // Bolt registration
-        vm.expectRevert(BoltSymbioticMiddlewareV1.NotVault.selector);
+        vm.expectRevert(SymbioticMiddlewareV1.NotVault.selector);
         middleware.whitelistVault(address(0));
 
         middleware.whitelistVault(address(wstEthVault));

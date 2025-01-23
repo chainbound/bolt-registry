@@ -17,12 +17,12 @@ import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/Pausea
 
 import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
 import {IOperatorsRegistryV1} from "../../src/interfaces/IOperatorsRegistryV1.sol";
-import {BoltEigenLayerMiddlewareV1} from "../../src/contracts/BoltEigenLayerMiddlewareV1.sol";
+import {EigenLayerMiddlewareV1} from "../../src/contracts/EigenLayerMiddlewareV1.sol";
 import {IWETH} from "../util/IWETH.sol";
 
-contract BoltEigenLayerMiddlewareV1Test is Test {
+contract EigenLayerMiddlewareV1Test is Test {
     OperatorsRegistryV1 registry;
-    BoltEigenLayerMiddlewareV1 middleware;
+    EigenLayerMiddlewareV1 middleware;
 
     address admin;
     address staker;
@@ -61,7 +61,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         registry.initialize(admin, 1 days);
 
         // --- Deploy the EL middleware ---
-        middleware = new BoltEigenLayerMiddlewareV1();
+        middleware = new EigenLayerMiddlewareV1();
         middleware.initialize(
             admin,
             registry,
@@ -190,13 +190,13 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
 
     function testCannotAddAlreadyWhitelistedStrategy() public {
         vm.prank(admin);
-        vm.expectRevert(BoltEigenLayerMiddlewareV1.StrategyAlreadyWhitelisted.selector);
+        vm.expectRevert(EigenLayerMiddlewareV1.StrategyAlreadyWhitelisted.selector);
         middleware.whitelistStrategy(address(holeskyStEthStrategy));
     }
 
     function testCannotAddInvalidStrategyAddress() public {
         vm.prank(admin);
-        vm.expectRevert(BoltEigenLayerMiddlewareV1.InvalidStrategyAddress.selector);
+        vm.expectRevert(EigenLayerMiddlewareV1.InvalidStrategyAddress.selector);
         middleware.whitelistStrategy(address(0));
     }
 
@@ -208,13 +208,13 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         createParams[0] = IAllocationManagerTypes.CreateSetParams({operatorSetId: 1, strategies: strategies});
 
         vm.prank(admin);
-        vm.expectRevert(BoltEigenLayerMiddlewareV1.UnauthorizedStrategy.selector);
+        vm.expectRevert(EigenLayerMiddlewareV1.UnauthorizedStrategy.selector);
         middleware.createOperatorSets(createParams);
     }
 
     function testCannotRemoveNonWhitelistedStrategy() public {
         vm.prank(admin);
-        vm.expectRevert(BoltEigenLayerMiddlewareV1.UnauthorizedStrategy.selector);
+        vm.expectRevert(EigenLayerMiddlewareV1.UnauthorizedStrategy.selector);
         middleware.removeStrategy(address(holeskyCbEthStrategy));
     }
 
@@ -251,7 +251,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         holeskyDelegationManager.registerAsOperator(delegationApprover, allocationDelay, uri);
 
         vm.prank(operator);
-        vm.expectRevert(BoltEigenLayerMiddlewareV1.NotAllocationManager.selector);
+        vm.expectRevert(EigenLayerMiddlewareV1.NotAllocationManager.selector);
         holeskyAllocationManager.registerForOperatorSets(
             operator,
             IAllocationManagerTypes.RegisterParams({
@@ -275,7 +275,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
             ISignatureUtils.SignatureWithSaltAndExpiry(operatorRawSignature, bytes32(0), UINT256_MAX);
 
         vm.prank(operator);
-        vm.expectRevert(BoltEigenLayerMiddlewareV1.NotOperator.selector);
+        vm.expectRevert(EigenLayerMiddlewareV1.NotOperator.selector);
         middleware.registerThroughAVSDirectory("http://stopjava.com", "operator1", operatorSignature);
     }
 }

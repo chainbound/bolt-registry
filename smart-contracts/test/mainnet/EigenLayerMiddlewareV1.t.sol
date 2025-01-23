@@ -16,7 +16,7 @@ import {OperatorSet} from "@eigenlayer/src/contracts/libraries/OperatorSetLib.so
 
 import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
 import {IOperatorsRegistryV1} from "../../src/interfaces/IOperatorsRegistryV1.sol";
-import {BoltEigenLayerMiddlewareV1} from "../../src/contracts/BoltEigenLayerMiddlewareV1.sol";
+import {EigenLayerMiddlewareV1} from "../../src/contracts/EigenLayerMiddlewareV1.sol";
 
 // This is needed because the registerAsOperator function has changed in ELIP-002
 // and we need to manually call it with the pre-ELIP-002 parameters
@@ -33,9 +33,9 @@ interface IDelegationManagerPreELIP002 {
     ) external;
 }
 
-contract BoltEigenLayerMiddlewareV1Test is Test {
+contract EigenLayerMiddlewareV1Test is Test {
     OperatorsRegistryV1 registry;
-    BoltEigenLayerMiddlewareV1 middleware;
+    EigenLayerMiddlewareV1 middleware;
 
     address admin;
     address staker;
@@ -67,7 +67,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         registry.initialize(admin, 1 days);
 
         // --- Deploy the EL middleware ---
-        middleware = new BoltEigenLayerMiddlewareV1();
+        middleware = new EigenLayerMiddlewareV1();
         middleware.initialize(
             admin,
             registry,

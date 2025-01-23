@@ -14,12 +14,11 @@ import {IDelegationManager} from "@eigenlayer/src/contracts/interfaces/IDelegati
 import {IStrategyManager} from "@eigenlayer/src/contracts/interfaces/IStrategyManager.sol";
 import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.sol";
 
-import {BoltSymbioticMiddlewareV1} from "../../src/contracts/BoltSymbioticMiddlewareV1.sol";
-import {BoltEigenLayerMiddlewareV1} from "../../src/contracts/BoltEigenLayerMiddlewareV1.sol";
+import {SymbioticMiddlewareV1} from "../../src/contracts/SymbioticMiddlewareV1.sol";
+import {EigenLayerMiddlewareV1} from "../../src/contracts/EigenLayerMiddlewareV1.sol";
 import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
-import {IBoltRestakingMiddlewareV1} from "../../src/interfaces/IBoltRestakingMiddlewareV1.sol";
 
-/// @notice Deploys the OperatorsRegistryV1, BoltSymbioticMiddlewareV1 and BoltEigenLayerMiddlewareV1 contracts,
+/// @notice Deploys the OperatorsRegistryV1, SymbioticMiddlewareV1 and EigenLayerMiddlewareV1 contracts,
 /// and links them by setting the restaking middlewares in the registry.
 contract DeployRegistry is Script {
     uint48 EPOCH_DURATION = 1 days;
@@ -31,8 +30,8 @@ contract DeployRegistry is Script {
     OperatorsRegistryV1 registry;
 
     string registryName = "OperatorsRegistryV1";
-    string symbioticMiddlewareName = "BoltSymbioticMiddlewareV1";
-    string eigenLayerMiddlewareName = "BoltEigenLayerMiddlewareV1";
+    string symbioticMiddlewareName = "SymbioticMiddlewareV1";
+    string eigenLayerMiddlewareName = "EigenLayerMiddlewareV1";
 
     // =============== Symbiotic Mainnet Deployments ================== //
     IRegistry vaultRegistry = IRegistry(0xAEb6bdd95c502390db8f52c8909F703E9Af6a346);
@@ -59,7 +58,7 @@ contract DeployRegistry is Script {
         registry = OperatorsRegistryV1(operatorsRegistry);
 
         initParams = abi.encodeCall(
-            BoltSymbioticMiddlewareV1.initialize,
+            SymbioticMiddlewareV1.initialize,
             (ADMIN, ADMIN, registry, vaultRegistry, operatorRegistry, operatorNetOptin)
         );
 
@@ -67,7 +66,7 @@ contract DeployRegistry is Script {
         console.log("Deployed %s at %s", symbioticMiddlewareName, symbioticMiddleware);
 
         initParams = abi.encodeCall(
-            BoltEigenLayerMiddlewareV1.initialize,
+            EigenLayerMiddlewareV1.initialize,
             (
                 ADMIN,
                 registry,

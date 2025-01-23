@@ -14,12 +14,12 @@ import {IDelegationManager} from "@eigenlayer/src/contracts/interfaces/IDelegati
 import {IStrategyManager} from "@eigenlayer/src/contracts/interfaces/IStrategyManager.sol";
 import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.sol";
 
-import {BoltSymbioticMiddlewareV1} from "../../src/contracts/BoltSymbioticMiddlewareV1.sol";
-import {BoltEigenLayerMiddlewareV1} from "../../src/contracts/BoltEigenLayerMiddlewareV1.sol";
+import {SymbioticMiddlewareV1} from "../../src/contracts/SymbioticMiddlewareV1.sol";
+import {EigenLayerMiddlewareV1} from "../../src/contracts/EigenLayerMiddlewareV1.sol";
 import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
-import {IBoltRestakingMiddlewareV1} from "../../src/interfaces/IBoltRestakingMiddlewareV1.sol";
+import {IRestakingMiddlewareV1} from "../../src/interfaces/IRestakingMiddlewareV1.sol";
 
-/// @notice Deploys the OperatorsRegistryV1, BoltSymbioticMiddlewareV1 and BoltEigenLayerMiddlewareV1 contracts,
+/// @notice Deploys the OperatorsRegistryV1, SymbioticMiddlewareV1 and EigenLayerMiddlewareV1 contracts,
 /// and links them by setting the restaking middlewares in the registry.
 contract DeployRegistry is Script {
     uint48 EPOCH_DURATION = 1 days;
@@ -27,8 +27,8 @@ contract DeployRegistry is Script {
     OperatorsRegistryV1 registry;
 
     string registryName = "OperatorsRegistryV1";
-    string symbioticMiddlewareName = "BoltSymbioticMiddlewareV1";
-    string eigenLayerMiddlewareName = "BoltEigenLayerMiddlewareV1";
+    string symbioticMiddlewareName = "SymbioticMiddlewareV1";
+    string eigenLayerMiddlewareName = "EigenLayerMiddlewareV1";
 
     // =============== Symbiotic Holesky Deployments ================== //
     IRegistry vaultRegistry = IRegistry(0x407A039D94948484D356eFB765b3c74382A050B4);
@@ -60,32 +60,32 @@ contract DeployRegistry is Script {
         registry = OperatorsRegistryV1(operatorsRegistry);
 
         initParams = abi.encodeCall(
-            BoltSymbioticMiddlewareV1.initialize,
+            SymbioticMiddlewareV1.initialize,
             (admin, network, registry, vaultRegistry, operatorRegistry, operatorNetOptin)
         );
 
         address symbioticMiddleware = Upgrades.deployUUPSProxy(symbioticMiddlewareName, initParams, opts);
         console.log("Deployed %s at %s", symbioticMiddlewareName, symbioticMiddleware);
 
-        registry.updateRestakingMiddleware("SYMBIOTIC", IBoltRestakingMiddlewareV1(symbioticMiddleware));
+        registry.updateRestakingMiddleware("SYMBIOTIC", IRestakingMiddlewareV1(symbioticMiddleware));
 
         initParams = abi.encodeCall(
-            BoltEigenLayerMiddlewareV1.initialize,
+            EigenLayerMiddlewareV1.initialize,
             (admin, registry, avsDirectory, allocationManager, delegationManager, strategyManager)
         );
 
         address eigenLayerMiddleware = Upgrades.deployUUPSProxy(eigenLayerMiddlewareName, initParams, opts);
         console.log("Deployed %s at %s", eigenLayerMiddlewareName, eigenLayerMiddleware);
 
-        registry.updateRestakingMiddleware("EIGENLAYER", IBoltRestakingMiddlewareV1(eigenLayerMiddleware));
+        registry.updateRestakingMiddleware("EIGENLAYER", IRestakingMiddlewareV1(eigenLayerMiddleware));
 
-        postDeployEigenLayer(BoltEigenLayerMiddlewareV1(eigenLayerMiddleware));
+        postDeployEigenLayer(EigenLayerMiddlewareV1(eigenLayerMiddleware));
 
         vm.stopBroadcast();
     }
 
     function postDeployEigenLayer(
-        BoltEigenLayerMiddlewareV1 middleware
+        EigenLayerMiddlewareV1 middleware
     ) public {
         // 1. Whitelist strategies
 
@@ -96,6 +96,6 @@ contract DeployRegistry is Script {
     }
 
     function postDeploySymbiotic(
-        BoltSymbioticMiddlewareV1 middleware
+        SymbioticMiddlewareV1 middleware
     ) public {}
 }
