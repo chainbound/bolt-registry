@@ -36,15 +36,15 @@ contract DeployRegistry is Script {
     string symbioticMiddlewareName = "BoltSymbioticMiddlewareV1";
     string eigenLayerMiddlewareName = "BoltEigenLayerMiddlewareV1";
 
-    // =============== Symbiotic Holesky Deployments ================== //
+    // =============== Symbiotic Mainnet Deployments ================== //
     IRegistry vaultRegistry = IRegistry(0x407A039D94948484D356eFB765b3c74382A050B4);
     IRegistry operatorRegistry = IRegistry(0x6F75a4ffF97326A00e52662d82EA4FdE86a2C548);
     IOptInService operatorNetOptin = IOptInService(0x58973d16FFA900D11fC22e5e2B6840d9f7e13401);
 
-    // =============== EigenLayer Holesky Deployments ================== //
-    IDelegationManager holeskyDelegationManager = IDelegationManager(0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A);
-    IStrategyManager holeskyStrategyManager = IStrategyManager(0x858646372CC42E1A627fcE94aa7A7033e7CF075A);
-    IAVSDirectory holeskyAVSDirectory = IAVSDirectory(0x135DDa560e946695d6f155dACaFC6f1F25C1F5AF);
+    // =============== EigenLayer Mainnet Deployments ================== //
+    IDelegationManager delegationManager = IDelegationManager(0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A);
+    IStrategyManager stategyManager = IStrategyManager(0x858646372CC42E1A627fcE94aa7A7033e7CF075A);
+    IAVSDirectory avsDirectory = IAVSDirectory(0x135DDa560e946695d6f155dACaFC6f1F25C1F5AF);
 
     function run() public {
         vm.startBroadcast();
@@ -74,11 +74,11 @@ contract DeployRegistry is Script {
             (
                 ADMIN,
                 registry,
-                holeskyAVSDirectory,
+                avsDirectory,
                 // Doesn't exist yet on mainnet
                 IAllocationManager(address(0)),
-                holeskyDelegationManager,
-                holeskyStrategyManager
+                delegationManager,
+                stategyManager
             )
         );
 
