@@ -24,6 +24,10 @@ import {IBoltRestakingMiddlewareV1} from "../../src/holesky/interfaces/IBoltRest
 contract DeployRegistry is Script {
     uint48 EPOCH_DURATION = 1 days;
 
+    // This is the address of the Safe multisig that controls the network
+    // and will be the admin too.
+    address ADMIN = 0xA42ec46F2c9DC671a72218E145CC13dc119fB722;
+
     OperatorsRegistryV1 registry;
     // BoltSymbioticMiddlewareV1 symbioticMiddleware;
     // BoltEigenLayerMiddlewareV1 eigenLayerMiddleware;
@@ -43,17 +47,13 @@ contract DeployRegistry is Script {
     IAVSDirectory holeskyAVSDirectory = IAVSDirectory(0x135DDa560e946695d6f155dACaFC6f1F25C1F5AF);
 
     function run() public {
-        // Admin == network
-        address admin = msg.sender;
-        address network = admin;
-
-        vm.startBroadcast(admin);
+        vm.startBroadcast();
 
         // TODO: Fix safe deploy, currently failing with `ASTDereferencerError` from openzeppelin
         Options memory opts;
         opts.unsafeSkipAllChecks = true;
 
-        bytes memory initParams = abi.encodeCall(OperatorsRegistryV1.initialize, (admin, EPOCH_DURATION));
+        bytes memory initParams = abi.encodeCall(OperatorsRegistryV1.initialize, (ADMIN, EPOCH_DURATION));
 
         // address middleware = Upgrades.deployUUPSProxy("SymbioticMiddlewareV1", initParams, opts);
         address operatorsRegistry = Upgrades.deployUUPSProxy(registryName, initParams, opts);
@@ -63,7 +63,7 @@ contract DeployRegistry is Script {
 
         initParams = abi.encodeCall(
             BoltSymbioticMiddlewareV1.initialize,
-            (admin, network, registry, vaultRegistry, operatorRegistry, operatorNetOptin)
+            (ADMIN, ADMIN, registry, vaultRegistry, operatorRegistry, operatorNetOptin)
         );
 
         address symbioticMiddleware = Upgrades.deployUUPSProxy(symbioticMiddlewareName, initParams, opts);
@@ -74,7 +74,7 @@ contract DeployRegistry is Script {
         initParams = abi.encodeCall(
             BoltEigenLayerMiddlewareV1.initialize,
             (
-                admin,
+                ADMIN,
                 registry,
                 holeskyAVSDirectory,
                 // Doesn't exist yet on mainnet
@@ -99,11 +99,14 @@ contract DeployRegistry is Script {
     ) public {
         // 1. Whitelist strategies
 
-        // 2. Initialize AVS wit AVS directory
+        // 2. Initialize AVS with AVS directory
         middleware.updateAVSMetadataURI("TODO", "TODO");
     }
 
     function postDeploySymbiotic(
         BoltSymbioticMiddlewareV1 middleware
-    ) public {}
+    ) public {
+        // 1. Whitelist vaults
+        // No vaults yet. This will need to be done by the admin.
+    }
 }
