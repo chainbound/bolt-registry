@@ -72,17 +72,14 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         );
 
         // 1. Whitelist the strategies in the middleware
-        middleware.addStrategyToWhitelist(address(holeskyStEthStrategy));
-        middleware.addStrategyToWhitelist(address(holeskyWethStrategy));
+        middleware.whitelistStrategy(address(holeskyStEthStrategy));
+        middleware.whitelistStrategy(address(holeskyWethStrategy));
 
         // check that the strategies are whitelisted
-        (address[] memory whitelistedStrategies, bool[] memory statuses) = middleware.getWhitelistedStrategies();
+        IStrategy[] memory whitelistedStrategies = middleware.getActiveWhitelistedStrategies();
         assertEq(whitelistedStrategies.length, 2);
-        assertEq(statuses.length, 2);
-        assertEq(whitelistedStrategies[0], address(holeskyStEthStrategy));
-        assertEq(whitelistedStrategies[1], address(holeskyWethStrategy));
-        assertEq(statuses[0], true);
-        assertEq(statuses[1], true);
+        assertEq(address(whitelistedStrategies[0]), address(holeskyStEthStrategy));
+        assertEq(address(whitelistedStrategies[1]), address(holeskyWethStrategy));
 
         IStrategy[] memory strategies = new IStrategy[](2);
         strategies[0] = holeskyStEthStrategy;
@@ -174,7 +171,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         holeskyAllocationManager.modifyAllocations(operator, allocs);
 
         // make sure the strategies are active in the middleware
-        IStrategy[] memory activeStrats = middleware.getActiveStrategies();
+        IStrategy[] memory activeStrats = middleware.getActiveWhitelistedStrategies();
         assertEq(activeStrats.length, 2);
 
         // 5. try to read the operator's collateral directly on the avs
@@ -194,13 +191,13 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
     function testCannotAddAlreadyWhitelistedStrategy() public {
         vm.prank(admin);
         vm.expectRevert(BoltEigenLayerMiddlewareV1.StrategyAlreadyWhitelisted.selector);
-        middleware.addStrategyToWhitelist(address(holeskyStEthStrategy));
+        middleware.whitelistStrategy(address(holeskyStEthStrategy));
     }
 
     function testCannotAddInvalidStrategyAddress() public {
         vm.prank(admin);
         vm.expectRevert(BoltEigenLayerMiddlewareV1.InvalidStrategyAddress.selector);
-        middleware.addStrategyToWhitelist(address(0));
+        middleware.whitelistStrategy(address(0));
     }
 
     function testCannotAddOperatorSetWithNonWhitelistedStrategy() public {
@@ -211,20 +208,20 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         createParams[0] = IAllocationManagerTypes.CreateSetParams({operatorSetId: 1, strategies: strategies});
 
         vm.prank(admin);
-        vm.expectRevert(BoltEigenLayerMiddlewareV1.StrategyNotWhitelisted.selector);
+        vm.expectRevert(BoltEigenLayerMiddlewareV1.UnauthorizedStrategy.selector);
         middleware.createOperatorSets(createParams);
     }
 
     function testCannotRemoveNonWhitelistedStrategy() public {
         vm.prank(admin);
-        vm.expectRevert(BoltEigenLayerMiddlewareV1.StrategyNotWhitelisted.selector);
-        middleware.removeStrategyFromWhitelist(address(holeskyCbEthStrategy));
+        vm.expectRevert(BoltEigenLayerMiddlewareV1.UnauthorizedStrategy.selector);
+        middleware.removeStrategy(address(holeskyCbEthStrategy));
     }
 
     function testCannotRemoveUnpausedStrategy() public {
         vm.prank(admin);
         vm.expectRevert(PauseableEnumerableSet.Enabled.selector);
-        middleware.removeStrategyFromWhitelist(address(holeskyStEthStrategy));
+        middleware.removeStrategy(address(holeskyStEthStrategy));
     }
 
     function testMustWaitImmutablePeriodBeforeRemovingStrategy() public {
@@ -233,11 +230,11 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
 
         vm.prank(admin);
         vm.expectRevert(PauseableEnumerableSet.ImmutablePeriodNotPassed.selector);
-        middleware.removeStrategyFromWhitelist(address(holeskyStEthStrategy));
+        middleware.removeStrategy(address(holeskyStEthStrategy));
 
         vm.warp(block.timestamp + 1 days + 1);
         vm.prank(admin);
-        middleware.removeStrategyFromWhitelist(address(holeskyStEthStrategy));
+        middleware.removeStrategy(address(holeskyStEthStrategy));
     }
 
     function testCannotUseAllocationManagerIfNotSet() public {

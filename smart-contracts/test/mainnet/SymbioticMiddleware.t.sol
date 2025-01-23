@@ -166,7 +166,7 @@ contract SymbioticMiddlewareMainnetTest is Test {
         assert(registry.isOperator(operator));
 
         // Activation requires a second to have passed
-        vm.warp(block.timestamp + 1);
+        skip(EPOCH_DURATION);
         assert(registry.isActiveOperator(operator));
 
         vm.stopPrank();
@@ -188,15 +188,21 @@ contract SymbioticMiddlewareMainnetTest is Test {
         middleware.registerOperator("https://rpc.boltprotocol.xyz", "BOLT");
 
         // Activation requires a second to have passed
-        vm.warp(block.timestamp + 1);
+        skip(EPOCH_DURATION);
         assert(registry.isActiveOperator(operator));
 
+        // This will actually pause the operator instantly
         middleware.deregisterOperator();
 
-        vm.warp(block.timestamp + 1);
         assert(!registry.isActiveOperator(operator));
 
-        vm.warp(block.timestamp + registry.EPOCH_DURATION());
+        // We may not clean up before an epoch has passed
+        skip(EPOCH_DURATION - 1);
+        registry.cleanup();
+        assert(registry.isOperator(operator));
+
+        // Should only be able to clean up AFTER an epoch duration has passed
+        skip(1);
         registry.cleanup();
         assert(!registry.isOperator(operator));
     }
@@ -217,12 +223,12 @@ contract SymbioticMiddlewareMainnetTest is Test {
         middleware.registerOperator("https://rpc.boltprotocol.xyz", "BOLT");
 
         // Activation requires a second to have passed
-        vm.warp(block.timestamp + 1);
+        skip(EPOCH_DURATION);
         assert(registry.isActiveOperator(operator));
 
         middleware.deregisterOperator();
 
-        vm.warp(block.timestamp + registry.EPOCH_DURATION());
+        skip(EPOCH_DURATION);
         // Clean up is only possible EPOCH_DURATION after deregistation
         registry.cleanup();
         assert(!registry.isOperator(operator));
@@ -250,11 +256,14 @@ contract SymbioticMiddlewareMainnetTest is Test {
 
         middleware.pauseVault(address(wstEthVault));
         // Pausing takes a sec
-        vm.warp(block.timestamp + 1);
-        assertEq(middleware.isVaultActive(address(wstEthVault)), false);
+        assertEq(middleware.isVaultActive(address(wstEthVault)), false, "Vault should be inactive");
+
+        skip(EPOCH_DURATION - 1);
+        vm.expectRevert();
+        middleware.removeVault(address(wstEthVault));
 
         // To remove, we need to pass the immutable period (EPOCH_DURATION)
-        vm.warp(block.timestamp + registry.EPOCH_DURATION());
+        skip(1);
         middleware.removeVault(address(wstEthVault));
         assertEq(middleware.vaultWhitelistLength(), 0);
     }

@@ -79,14 +79,12 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         );
 
         // 1. Whitelist the strategies in the middleware
-        middleware.addStrategyToWhitelist(address(mainnetCbEthStrategy));
+        middleware.whitelistStrategy(address(mainnetCbEthStrategy));
 
         // check that the strategies are whitelisted
-        (address[] memory whitelistedStrategies, bool[] memory statuses) = middleware.getWhitelistedStrategies();
+        IStrategy[] memory whitelistedStrategies = middleware.getActiveWhitelistedStrategies();
         assertEq(whitelistedStrategies.length, 1);
-        assertEq(statuses.length, 1);
-        assertEq(whitelistedStrategies[0], address(mainnetCbEthStrategy));
-        assertEq(statuses[0], true);
+        assertEq(address(whitelistedStrategies[0]), address(mainnetCbEthStrategy));
 
         // IStrategy[] memory strategies = new IStrategy[](1);
         // strategies[0] = mainnetStEthStrategy;
@@ -181,7 +179,7 @@ contract BoltEigenLayerMiddlewareV1Test is Test {
         assertEq(mainnetDelegationManager.delegatedTo(staker), operator);
 
         // make sure the strategies are active in the middleware
-        IStrategy[] memory activeStrats = middleware.getActiveStrategies();
+        IStrategy[] memory activeStrats = middleware.getActiveWhitelistedStrategies();
         assertEq(activeStrats.length, 1);
         assertEq(address(activeStrats[0]), address(mainnetCbEthStrategy));
 

@@ -74,8 +74,8 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     function initialize(address owner, uint48 epochDuration) public initializer {
         __Ownable_init(owner);
 
-        START_TIMESTAMP = Time.timestamp();
         EPOCH_DURATION = epochDuration;
+        START_TIMESTAMP = Time.timestamp();
     }
 
     /// @notice Upgrade the contract
@@ -126,7 +126,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         require(bytes(rpcEndpoint).length > 0, InvalidRpc());
         require(signer != address(0), InvalidSigner());
 
-        _operatorAddresses.register(Time.timestamp(), signer);
+        _operatorAddresses.register(_now(), signer);
         operators[signer] = Operator(signer, rpcEndpoint, msg.sender, extraData);
 
         emit OperatorRegistered(signer, rpcEndpoint, msg.sender, extraData);
@@ -139,7 +139,9 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     function pauseOperator(
         address signer
     ) external onlyMiddleware {
-        _operatorAddresses.pause(EPOCH_DURATION, signer);
+        // NOTE: we use _now() - 1 to ensure that the operator is paused in the current epoch.
+        // If we didn't do this, we would have to wait until the next epoch until the operator was actually paused.
+        _operatorAddresses.pause(_now() - 1, signer);
         emit OperatorPaused(signer, msg.sender);
     }
 
@@ -150,7 +152,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     function unpauseOperator(
         address signer
     ) external onlyMiddleware {
-        _operatorAddresses.unpause(Time.timestamp(), EPOCH_DURATION, signer);
+        _operatorAddresses.unpause(_now(), EPOCH_DURATION, signer);
         emit OperatorUnpaused(signer, msg.sender);
     }
 
@@ -160,6 +162,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     /// @dev Only restaking middleware contracts can call this function
     function updateOperatorRpcEndpoint(address signer, string memory newRpcEndpoint) external onlyMiddleware {
         require(_operatorAddresses.contains(signer), UnknownOperator());
+        require(bytes(newRpcEndpoint).length > 0, InvalidRpc());
 
         operators[signer].rpcEndpoint = newRpcEndpoint;
     }
@@ -173,7 +176,8 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     ) external onlyMiddleware {
         require(_operatorAddresses.contains(signer), UnknownOperator());
 
-        _operatorAddresses.unregister(Time.timestamp(), EPOCH_DURATION, signer);
+        // NOTE: we use _now() - 1 to ensure that the operator is deregistered in the current epoch.
+        _operatorAddresses.unregister(_now() - 1, EPOCH_DURATION, signer);
         delete operators[signer];
 
         emit OperatorDeregistered(signer, msg.sender);
@@ -195,7 +199,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     /// @notice Returns the active operators in the registry.
     /// @return operators The array of active operators.
     function getActiveOperators() public view returns (Operator[] memory) {
-        address[] memory addrs = _operatorAddresses.getActive(Time.timestamp());
+        address[] memory addrs = _operatorAddresses.getActive(_now());
 
         Operator[] memory ops = new Operator[](addrs.length);
         for (uint256 i = 0; i < addrs.length; i++) {
@@ -215,8 +219,7 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         require(_operatorAddresses.contains(signer), UnknownOperator());
 
         operator = operators[signer];
-
-        return (operator, _operatorAddresses.wasActiveAt(Time.timestamp(), signer));
+        isActive = _operatorAddresses.wasActiveAt(_now(), signer);
     }
 
     /// @notice Returns true if the given address is an operator in the registry.
@@ -234,15 +237,15 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     function isActiveOperator(
         address signer
     ) public view returns (bool) {
-        return _operatorAddresses.wasActiveAt(Time.timestamp(), signer);
+        return _operatorAddresses.wasActiveAt(_now(), signer);
     }
 
     /// @notice Cleans up any expired operators (i.e. paused + EPOCH_DURATION has passed).
     function cleanup() public {
         for (uint256 i = 0; i < _operatorAddresses.length(); i++) {
             (address signer,,) = _operatorAddresses.at(i);
-            if (_operatorAddresses.checkUnregister(Time.timestamp(), EPOCH_DURATION, signer)) {
-                _operatorAddresses.unregister(Time.timestamp(), EPOCH_DURATION, signer);
+            if (_operatorAddresses.checkUnregister(_now(), EPOCH_DURATION, signer)) {
+                _operatorAddresses.unregister(_now(), EPOCH_DURATION, signer);
                 delete operators[signer];
 
                 emit OperatorDeregistered(signer, msg.sender);
@@ -270,5 +273,20 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
         } else {
             revert InvalidMiddleware("Unknown restaking protocol, want EIGENLAYER or SYMBIOTIC");
         }
+    }
+
+    /// @notice Check if a map entry was active at a given timestamp.
+    /// @param enabledTime The enabled time of the map entry.
+    /// @param disabledTime The disabled time of the map entry.
+    /// @param timestamp The timestamp to check the map entry status at.
+    /// @return True if the map entry was active at the given timestamp, false otherwise.
+    function _wasEnabledAt(uint48 enabledTime, uint48 disabledTime, uint48 timestamp) private pure returns (bool) {
+        return enabledTime != 0 && enabledTime <= timestamp && (disabledTime == 0 || disabledTime >= timestamp);
+    }
+
+    /// @notice Returns the timestamp of the current epoch.
+    /// @return timestamp The current epoch timestamp.
+    function _now() internal view returns (uint48) {
+        return getCurrentEpochStartTimestamp();
     }
 }
