@@ -300,10 +300,12 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @notice Get the strategies that an operator can restake in
     /// @param operator The operator address to get the restakeable strategies for
     /// @return The restakeable strategy addresses
-    function getRestakeableStrategies(address operator) public view returns (address[] memory) {
+    function getRestakeableStrategies(
+        address operator
+    ) public view returns (address[] memory) {
         // All operators can use all whitelisted, active strategies.
         IStrategy[] memory strategies = getActiveWhitelistedStrategies();
-        
+
         // cast to address[] to match the return type
         address[] memory result = new address[](strategies.length);
         for (uint256 i = 0; i < strategies.length; i++) {
