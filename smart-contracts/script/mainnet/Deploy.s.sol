@@ -20,12 +20,16 @@ import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
 
 /// @notice Deploys the OperatorsRegistryV1, SymbioticMiddlewareV1 and EigenLayerMiddlewareV1 contracts,
 /// and links them by setting the restaking middlewares in the registry.
+/// @dev Deploy with:
+/// forge script script/mainnet/Deploy.s.sol --rpc-url https://eth.drpc.org --private-key $PRIVATE_KEY --broadcast -vvvv
 contract DeployRegistry is Script {
     uint48 EPOCH_DURATION = 1 days;
 
     // This is the address of the Safe multisig that controls the network
-    // and will be the admin too.
+    // and will be the admin too (mempirate.eth)
     address ADMIN = 0xA42ec46F2c9DC671a72218E145CC13dc119fB722;
+
+    address DEPLOYER = 0x80170Ada568F5DAf3EA75Abc8a4d20a2892AD1b7;
 
     OperatorsRegistryV1 registry;
 
@@ -44,6 +48,11 @@ contract DeployRegistry is Script {
     IAVSDirectory avsDirectory = IAVSDirectory(0x135DDa560e946695d6f155dACaFC6f1F25C1F5AF);
 
     function run() public {
+        if (msg.sender != DEPLOYER) {
+            console.log("Get gud");
+            return;
+        }
+
         vm.startBroadcast();
 
         Options memory opts;
