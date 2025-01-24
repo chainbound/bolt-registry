@@ -33,14 +33,12 @@ contract OperatorsRegistryV1 is IOperatorsRegistryV1, OwnableUpgradeable, UUPSUp
     /// @notice The address of the Symbiotic restaking middleware
     IRestakingMiddlewareV1 public SYMBIOTIC_RESTAKING_MIDDLEWARE;
 
-    /**
-     * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shifting down storage in the inheritance chain.
-     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-     * This can be validated with the Openzeppelin Foundry Upgrades toolkit.
-     *
-     * Total storage slots: 50
-     */
+    /// @dev This empty reserved space is put in place to allow future versions to add new
+    /// variables without shifting down storage in the inheritance chain.
+    /// See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+    /// This can be validated with the Openzeppelin Foundry Upgrades toolkit.
+    ///
+    /// Total storage slots: 50
     uint256[44] private __gap;
 
     // ===================== ERRORS ======================== //
