@@ -186,6 +186,18 @@ contract EigenLayerMiddlewareV1Test is Test {
         // weth should have 100e18 balance
         assertEq(collaterals[1], address(holeskyWeth));
         assertEq(amounts[1], 100 ether);
+
+        // Check the operator's restaked strategies
+        address[] memory restakedStrategies = middleware.getOperatorRestakedStrategies(operator);
+        assertEq(restakedStrategies.length, 1);
+        assertEq(restakedStrategies[0], address(holeskyWethStrategy));
+    }
+
+    function testReadRestakeableStrategies() public view {
+        address[] memory strategies = middleware.getRestakeableStrategies(operator);
+        assertEq(strategies.length, 2);
+        assertEq(strategies[0], address(holeskyStEthStrategy));
+        assertEq(strategies[1], address(holeskyWethStrategy));
     }
 
     function testCannotAddAlreadyWhitelistedStrategy() public {
@@ -242,7 +254,7 @@ contract EigenLayerMiddlewareV1Test is Test {
         middleware.updateAllocationManagerAddress(address(0));
 
         // When the AllocationManager is set to 0x0, the only way to opt-in
-        // is through the middeware.registerThroughAVSDirectory() method.
+        // is through the middeware.registerOperatorToAVS() method.
 
         uint32 allocationDelay = 1;
         address delegationApprover = address(0x0); // this is optional, skip it
@@ -276,6 +288,6 @@ contract EigenLayerMiddlewareV1Test is Test {
 
         vm.prank(operator);
         vm.expectRevert(EigenLayerMiddlewareV1.NotOperator.selector);
-        middleware.registerThroughAVSDirectory("http://stopjava.com", "operator1", operatorSignature);
+        middleware.registerOperatorToAVS("http://stopjava.com", "operator1", operatorSignature);
     }
 }

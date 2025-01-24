@@ -271,11 +271,11 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @return The restaked strategy addresses
     function getOperatorRestakedStrategies(
         address operator
-    ) returns (address[] memory) {
+    ) public returns (address[] memory) {
         // Only take strategies that are active at <timestamp>
         IStrategy[] memory activeStrategies = _getActiveStrategiesAt(_now());
 
-        address[] memory collateralTokens = new address[](activeStrategies.length);
+        address[] memory restakedStrategies = new address[](activeStrategies.length);
 
         // get the shares of the operator across all strategies
         uint256[] memory shares = DELEGATION_MANAGER.getOperatorShares(operator, activeStrategies);
@@ -284,14 +284,14 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
         uint256 restakedCount = 0;
         for (uint256 i = 0; i < activeStrategies.length; i++) {
             if (activeStrategies[i].sharesToUnderlyingView(shares[i]) > 0) {
-                collateralTokens[restakedCount] = address(activeStrategies[i].underlyingToken());
+                restakedStrategies[restakedCount] = address(activeStrategies[i]);
                 restakedCount++;
             }
         }
 
         address[] memory result = new address[](restakedCount);
         for (uint256 i = 0; i < restakedCount; i++) {
-            result[i] = collateralTokens[i];
+            result[i] = restakedStrategies[i];
         }
 
         return result;
@@ -300,8 +300,17 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @notice Get the strategies that an operator can restake in
     /// @param operator The operator address to get the restakeable strategies for
     /// @return The restakeable strategy addresses
-    function getRestakeableStrategies() external view returns (address[] memory) {
-        return getActiveWhitelistedStrategies();
+    function getRestakeableStrategies(address operator) public view returns (address[] memory) {
+        // All operators can use all whitelisted, active strategies.
+        IStrategy[] memory strategies = getActiveWhitelistedStrategies();
+        
+        // cast to address[] to match the return type
+        address[] memory result = new address[](strategies.length);
+        for (uint256 i = 0; i < strategies.length; i++) {
+            result[i] = address(strategies[i]);
+        }
+
+        return result;
     }
 
     // ========= [post-ELIP-002] IAVSRegistrar functions ========= //
