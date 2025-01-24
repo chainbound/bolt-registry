@@ -247,10 +247,10 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     function deregisterOperatorFromAVS() public {
         address operator = msg.sender;
 
-        require(DELEGATION_MANAGER.isOperator(msg.sender), NotOperator());
+        require(DELEGATION_MANAGER.isOperator(operator), NotOperator());
 
         AVS_DIRECTORY.deregisterOperatorFromAVS(operator);
-        OPERATORS_REGISTRY.pauseOperator(msg.sender);
+        OPERATORS_REGISTRY.pauseOperator(operator);
     }
 
     /// @notice Update the metadata URI for this AVS
