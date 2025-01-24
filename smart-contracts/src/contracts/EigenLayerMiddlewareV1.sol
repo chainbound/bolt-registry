@@ -113,7 +113,7 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
         address newImplementation
     ) internal override onlyOwner {}
 
-    // ========= modifiers ========= //
+    // ========= Modifiers ========= //
 
     /// @notice Modifier to check if the caller is the AllocationManager
     modifier onlyAllocationManager() {
@@ -220,7 +220,7 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
         return _strategyWhitelist.wasActiveAt(_now(), strategy);
     }
 
-    // ========= [pre-slashing only] AVS Registration functions ========= //
+    // ========= [pre-ELIP-002] IServiceManager functions ========= //
 
     /// @notice Register an operator through the AVS Directory
     /// @param rpcEndpoint The RPC URL of the operator
@@ -228,7 +228,7 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @param operatorSignature The signature of the operator
     /// @dev This function is used before the ELIP-002 (slashing) EigenLayer upgrade to register operators.
     /// @dev Operators must use this function to register before the upgrade. After the upgrade, this will be removed.
-    function registerThroughAVSDirectory(
+    function registerOperatorToAVS(
         string memory rpcEndpoint,
         string memory extraData,
         ISignatureUtils.SignatureWithSaltAndExpiry calldata operatorSignature
@@ -244,16 +244,78 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @notice Deregister an operator through the AVS Directory
     /// @dev This function is used before the ELIP-002 (slashing) EigenLayer upgrade to deregister operators.
     /// @dev Operators must use this function to deregister before the upgrade. After the upgrade, this will be removed.
-    function deregisterThroughAVSDirectory() public {
+    function deregisterOperatorFromAVS() public {
         address operator = msg.sender;
 
-        require(DELEGATION_MANAGER.isOperator(msg.sender), NotOperator());
+        require(DELEGATION_MANAGER.isOperator(operator), NotOperator());
 
         AVS_DIRECTORY.deregisterOperatorFromAVS(operator);
-        OPERATORS_REGISTRY.pauseOperator(msg.sender);
+        OPERATORS_REGISTRY.pauseOperator(operator);
     }
 
-    // ========= AVS Registrar functions ========= //
+    /// @notice Update the metadata URI for this AVS
+    /// @param contractName The name of the contract to update the metadata URI for
+    /// @param metadataURI The new metadata URI
+    function updateAVSMetadataURI(string calldata contractName, string calldata metadataURI) public onlyOwner {
+        bytes32 contractNameHash = keccak256(abi.encodePacked(contractName));
+
+        if (contractNameHash == keccak256("ALLOCATION_MANAGER")) {
+            ALLOCATION_MANAGER.updateAVSMetadataURI(address(this), metadataURI);
+        } else if (contractNameHash == keccak256("AVS_DIRECTORY")) {
+            AVS_DIRECTORY.updateAVSMetadataURI(metadataURI);
+        }
+    }
+
+    /// @notice Get the strategies that an operator has restaked in
+    /// @param operator The operator address to get the restaked strategies for
+    /// @return The restaked strategy addresses
+    function getOperatorRestakedStrategies(
+        address operator
+    ) public returns (address[] memory) {
+        // Only take strategies that are active at <timestamp>
+        IStrategy[] memory activeStrategies = _getActiveStrategiesAt(_now());
+
+        address[] memory restakedStrategies = new address[](activeStrategies.length);
+
+        // get the shares of the operator across all strategies
+        uint256[] memory shares = DELEGATION_MANAGER.getOperatorShares(operator, activeStrategies);
+
+        // get the collateral tokens and amounts for the operator across all strategies
+        uint256 restakedCount = 0;
+        for (uint256 i = 0; i < activeStrategies.length; i++) {
+            if (activeStrategies[i].sharesToUnderlyingView(shares[i]) > 0) {
+                restakedStrategies[restakedCount] = address(activeStrategies[i]);
+                restakedCount++;
+            }
+        }
+
+        address[] memory result = new address[](restakedCount);
+        for (uint256 i = 0; i < restakedCount; i++) {
+            result[i] = restakedStrategies[i];
+        }
+
+        return result;
+    }
+
+    /// @notice Get the strategies that an operator can restake in
+    /// @param operator The operator address to get the restakeable strategies for
+    /// @return The restakeable strategy addresses
+    function getRestakeableStrategies(
+        address operator
+    ) public view returns (address[] memory) {
+        // All operators can use all whitelisted, active strategies.
+        IStrategy[] memory strategies = getActiveWhitelistedStrategies();
+
+        // cast to address[] to match the return type
+        address[] memory result = new address[](strategies.length);
+        for (uint256 i = 0; i < strategies.length; i++) {
+            result[i] = address(strategies[i]);
+        }
+
+        return result;
+    }
+
+    // ========= [post-ELIP-002] IAVSRegistrar functions ========= //
 
     /// @notice Allows the AllocationManager to hook into the middleware to validate operator registration
     /// @param operator The address of the operator
@@ -367,19 +429,6 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @param strategies The strategies to remove
     function removeStrategiesFromOperatorSet(uint32 operatorSetId, IStrategy[] calldata strategies) public onlyOwner {
         ALLOCATION_MANAGER.removeStrategiesFromOperatorSet(address(this), operatorSetId, strategies);
-    }
-
-    /// @notice Update the metadata URI for this AVS
-    /// @param contractName The name of the contract to update the metadata URI for
-    /// @param metadataURI The new metadata URI
-    function updateAVSMetadataURI(string calldata contractName, string calldata metadataURI) public onlyOwner {
-        bytes32 contractNameHash = keccak256(abi.encodePacked(contractName));
-
-        if (contractNameHash == keccak256("ALLOCATION_MANAGER")) {
-            ALLOCATION_MANAGER.updateAVSMetadataURI(address(this), metadataURI);
-        } else if (contractNameHash == keccak256("AVS_DIRECTORY")) {
-            AVS_DIRECTORY.updateAVSMetadataURI(metadataURI);
-        }
     }
 
     /// @notice Update the AllocationManager address

@@ -140,7 +140,7 @@ contract EigenLayerMiddlewareV1Test is Test {
             ISignatureUtils.SignatureWithSaltAndExpiry(operatorRawSignature, bytes32(0), UINT256_MAX);
 
         vm.prank(signer);
-        middleware.registerThroughAVSDirectory(rpcEndpoint, extraData, operatorSignature);
+        middleware.registerOperatorToAVS(rpcEndpoint, extraData, operatorSignature);
 
         vm.warp(block.timestamp + 1 days);
 
