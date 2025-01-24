@@ -271,7 +271,7 @@ contract EigenLayerMiddlewareV1 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @return The restaked strategy addresses
     function getOperatorRestakedStrategies(
         address operator
-    ) public returns (address[] memory) {
+    ) public view returns (address[] memory) {
         // Only take strategies that are active at <timestamp>
         IStrategy[] memory activeStrategies = _getActiveStrategiesAt(_now());
 
