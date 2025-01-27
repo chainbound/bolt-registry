@@ -20,7 +20,7 @@ import {INetworkRegistry} from "@symbiotic/core/interfaces/INetworkRegistry.sol"
 import {IBaseDelegator} from "@symbiotic/core/interfaces/delegator/IBaseDelegator.sol";
 import {Subnetwork} from "@symbiotic/core/contracts/libraries/Subnetwork.sol";
 
-import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4.9.0/contracts/interfaces/IERC20.sol";
 
 contract SymbioticMiddlewareMainnetTest is Test {
     using Subnetwork for address;

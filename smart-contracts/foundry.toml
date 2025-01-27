@@ -14,7 +14,8 @@ ignored_warnings_from = ["lib/openzeppelin-contracts/contracts"]
 
 remappings = [
     # Bolt-Registry remappings
-    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin-v4.9.0/=lib/openzeppelin-contracts-v4.9.0/",
+    "@openzeppelin-v5.0.0/=lib/openzeppelin-contracts-v5.0.0/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
     "@openzeppelin/foundry-upgrades/=lib/openzeppelin-foundry-upgrades/",
     "@symbiotic/middleware-sdk/=lib/middleware-sdk/src/",
@@ -33,7 +34,9 @@ remappings = [
 
     # EigenLayer remapping contexts
     "lib/eigenlayer-contracts/:@openzeppelin-upgrades/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0/",
-    "lib/eigenlayer-contracts/:@openzeppelin/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/",
+    # Note: we pin the openzeppelin version used for EL to 4.9.0. When/if EL upgrades to v5, we need to update this.
+    # "lib/eigenlayer-contracts/:@openzeppelin/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/",
+    "lib/eigenlayer-contracts/:@openzeppelin/=lib/openzeppelin-contracts-v4.9.0",
     "lib/eigenlayer-contracts/:ds-test/=lib/eigenlayer-contracts/lib/ds-test/src/",
     "lib/eigenlayer-contracts/:forge-std/=lib/eigenlayer-contracts/lib/forge-std/src/"
 ]
