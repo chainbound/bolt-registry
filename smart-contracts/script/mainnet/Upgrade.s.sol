@@ -4,6 +4,7 @@ pragma solidity 0.8.27;
 import {Script, console} from "forge-std/Script.sol";
 
 import {ERC1967Proxy} from "@openzeppelin-v5.0.0/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Ownable} from "@openzeppelin-v5.0.0/contracts/access/Ownable.sol";
 import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
 
 import {IRegistry} from "@symbiotic/core/interfaces/common/IRegistry.sol";
@@ -37,16 +38,17 @@ contract UpgradeRegistry is Script {
         address admin = msg.sender;
 
         console.log("Upgrading Symbiotic middleware with admin: %s", admin);
-        console.log("Did you update the variables in this script correctly?");
 
         // Note: these variables MUST be updated correctly before each run of this script
         string memory UPGRADE_FROM = "SymbioticMiddlewareV1";
-        address OLD_IMPLEMENTATION = 0x0aC0488aF24E9064F703a2263762Db26EdFc5Bbe;
+        address OLD_PROXY = 0x74c4eF33fce5bbfDb786c65efca513C68C7d19C3;
         string memory UPGRADE_TO = "SymbioticMiddlewareV2";
 
         console.log("Upgrading Symbiotic middleware from %s to %s", UPGRADE_FROM, UPGRADE_TO);
 
-        // TODO: make sure the admin is also the owner of the old middleware
+        if (Ownable(OLD_PROXY).owner() != admin) {
+            revert("Admin is not the owner of the old middleware");
+        }
 
         Options memory opts;
         opts.unsafeSkipAllChecks = true;
@@ -73,16 +75,17 @@ contract UpgradeRegistry is Script {
         address admin = msg.sender;
 
         console.log("Upgrading EigenLayer middleware with admin: %s", admin);
-        console.log("Did you update the variables in this script correctly?");
 
         // Note: these variables MUST be updated correctly before each run of this script
         string memory UPGRADE_FROM = "EigenLayerMiddlewareV1";
-        address OLD_IMPLEMENTATION = 0xF66Ae0a151E4Dc7c4b7cCd2d0D2cc662F1F3a103;
+        address OLD_PROXY = 0x35DebC00531Ac8771be5dbEf015feFD084efA958;
         string memory UPGRADE_TO = "EigenLayerMiddlewareV2";
 
         console.log("Upgrading EigenLayer middleware from %s to %s", UPGRADE_FROM, UPGRADE_TO);
 
-        // TODO: make sure the admin is also the owner of the old middleware
+        if (Ownable(OLD_PROXY).owner() != admin) {
+            revert("Admin is not the owner of the old middleware");
+        }
 
         Options memory opts;
         opts.unsafeSkipAllChecks = true;
@@ -109,7 +112,7 @@ contract UpgradeRegistry is Script {
 
         vm.startBroadcast(admin);
 
-        Upgrades.upgradeProxy(OLD_IMPLEMENTATION, UPGRADE_TO, initBytes, opts);
+        Upgrades.upgradeProxy(OLD_PROXY, UPGRADE_TO, initBytes, opts);
 
         vm.stopBroadcast();
 
@@ -120,11 +123,10 @@ contract UpgradeRegistry is Script {
         address admin = msg.sender;
 
         console.log("Upgrading OperatorsRegistry with admin: %s", admin);
-        console.log("Did you update the variables in this script correctly?");
 
         // Note: these variables MUST be updated correctly before each run of this script
         string memory UPGRADE_FROM = "OperatorsRegistryV1";
-        address OLD_IMPLEMENTATION = 0x0F2a3B9Caea77eA58BFb42ea81c4292157122D63;
+        address OLD_PROXY = 0x630869F51C012C797FEb3D9006F4280587C78b3f;
         string memory UPGRADE_TO = "OperatorsRegistryV2";
 
         console.log("Upgrading OperatorsRegistry from %s to %s", UPGRADE_FROM, UPGRADE_TO);
