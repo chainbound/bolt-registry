@@ -2,8 +2,8 @@
 pragma solidity ^0.8.27;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
-import {Time} from "@openzeppelin/contracts/utils/types/Time.sol";
+import {UUPSUpgradeable} from "@openzeppelin-v5.0.0/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {Time} from "@openzeppelin-v5.0.0/contracts/utils/types/Time.sol";
 
 import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
