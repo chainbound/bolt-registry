@@ -3,7 +3,7 @@ pragma solidity 0.8.27;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin-v5.0.0/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
 
 import {IRegistry} from "@symbiotic/core/interfaces/common/IRegistry.sol";
@@ -24,6 +24,9 @@ import {IRestakingMiddlewareV1} from "../../src/interfaces/IRestakingMiddlewareV
 contract DeployRegistry is Script {
     uint48 EPOCH_DURATION = 1 days;
 
+    // this is both the symbiotic network address and the holesky admin wallet
+    address NETWORK = 0xb017002D8024d8c8870A5CECeFCc63887650D2a4;
+
     OperatorsRegistryV1 registry;
 
     string registryName = "OperatorsRegistryV1";
@@ -42,9 +45,8 @@ contract DeployRegistry is Script {
     IAVSDirectory avsDirectory = IAVSDirectory(0x055733000064333CaDDbC92763c58BF0192fFeBf);
 
     function run() public {
-        // Admin == network
         address admin = msg.sender;
-        address network = admin;
+        console.log("Deploying as admin: %s", admin);
 
         vm.startBroadcast(admin);
 
@@ -61,7 +63,7 @@ contract DeployRegistry is Script {
 
         initParams = abi.encodeCall(
             SymbioticMiddlewareV1.initialize,
-            (admin, network, registry, vaultRegistry, operatorRegistry, operatorNetOptin)
+            (admin, NETWORK, registry, vaultRegistry, operatorRegistry, operatorNetOptin)
         );
 
         address symbioticMiddleware = Upgrades.deployUUPSProxy(symbioticMiddlewareName, initParams, opts);
@@ -92,7 +94,7 @@ contract DeployRegistry is Script {
         // 2. Create operator sets
 
         // 3. Initialize AVS wit AVS directory
-        middleware.updateAVSMetadataURI("TODO", "TODO");
+        // middleware.updateAVSMetadataURI("TODO", "TODO");
     }
 
     function postDeploySymbiotic(

@@ -3,7 +3,7 @@ pragma solidity 0.8.27;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {ERC1967Proxy} from "@openzeppelin-v5.0.0/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Upgrades, Options} from "@openzeppelin/foundry-upgrades/src/Upgrades.sol";
 
 import {IRegistry} from "@symbiotic/core/interfaces/common/IRegistry.sol";
@@ -26,7 +26,7 @@ contract DeployRegistry is Script {
     uint48 EPOCH_DURATION = 1 days;
 
     // This is the address of the Safe multisig that controls the network
-    // and will be the admin too (mempirate.eth)
+    // and will be the admin too (boltprotocol.eth)
     address ADMIN = 0xA42ec46F2c9DC671a72218E145CC13dc119fB722;
 
     address DEPLOYER = 0x80170Ada568F5DAf3EA75Abc8a4d20a2892AD1b7;
@@ -49,7 +49,7 @@ contract DeployRegistry is Script {
 
     function run() public {
         if (msg.sender != DEPLOYER) {
-            console.log("Get gud");
+            console.log("Wrong deployer address, only %s can deploy", DEPLOYER);
             return;
         }
 
