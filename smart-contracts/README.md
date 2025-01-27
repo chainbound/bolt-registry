@@ -10,7 +10,7 @@ Mainnet contracts are deployed at the following addresses:
 | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------- |
 | [OperatorsRegistryV1](./src/contracts/OperatorsRegistryV1.sol)       | [0x630869F51C012C797FEb3D9006F4280587C78b3f](https://etherscan.io/address/0x630869F51C012C797FEb3D9006F4280587C78b3f#code) | [0x0f2a...2d63](https://etherscan.io/address/0x0f2a3b9caea77ea58bfb42ea81c4292157122d63#code) | UUPS Proxy |
 | [SymbioticMiddlewareV1](./src/contracts/SymbioticMiddlewareV1.sol)   | [0x74c4eF33fce5bbfDb786c65efca513C68C7d19C3](https://etherscan.io/address/0x74c4eF33fce5bbfDb786c65efca513C68C7d19C3#code) | [0x0aC0...5Bbe](https://etherscan.io/address/0x0aC0488aF24E9064F703a2263762Db26EdFc5Bbe#code) | UUPS Proxy |
-| [EigenLayerMiddlewareV1](./src/contracts/EigenLayerMiddlewareV1.sol) | [0x35DebC00531Ac8771be5dbEf015feFD084efA958](https://ethescan.io/address/0x35DebC00531Ac8771be5dbEf015feFD084efA958#code)  | [0xF66A...a103](https://etherscan.io/address/0xF66Ae0a151E4Dc7c4b7cCd2d0D2cc662F1F3a103#code) | UUPS Proxy |
+| [EigenLayerMiddlewareV1](./src/contracts/EigenLayerMiddlewareV1.sol) | [0x35DebC00531Ac8771be5dbEf015feFD084efA958](https://etherscan.io/address/0x35DebC00531Ac8771be5dbEf015feFD084efA958#code) | [0xF66A...a103](https://etherscan.io/address/0xF66Ae0a151E4Dc7c4b7cCd2d0D2cc662F1F3a103#code) | UUPS Proxy |
 
 ### Holesky
 
