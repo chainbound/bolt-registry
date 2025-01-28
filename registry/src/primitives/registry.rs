@@ -4,15 +4,17 @@ use alloy::primitives::{Address, U256};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use url::Url;
+use utoipa::ToSchema;
 
 use super::{BlsPublicKey, BlsSignature, Digest};
 
 /// A batch registration of validators.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct RegistrationBatch {
     /// Validators being registered.
     pub(crate) validator_pubkeys: Vec<BlsPublicKey>,
     /// Operator that can sign commitments on behalf of the validators.
+    #[schema(value_type = String)]
     pub(crate) operator: Address,
     /// Gas limit reserved for commitments.
     pub(crate) gas_limit: u64,
@@ -21,6 +23,7 @@ pub(crate) struct RegistrationBatch {
     /// If set to 0, never expires
     pub(crate) expiry: u64, // UNIX timestamp value in seconds
     /// Signatures would be: sign(digest(`operator` + `gas_limit` + `expiry`))
+    #[schema(value_type = Vec<String>)]
     pub(crate) signatures: Vec<BlsSignature>,
 }
 
@@ -61,30 +64,34 @@ impl RegistrationBatch {
 }
 
 /// A single registration of a validator.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct Registration {
     /// Validator being registered.
     pub(crate) validator_pubkey: BlsPublicKey,
     /// Index of the validator in the beacon chain.
     pub(crate) validator_index: u64,
     /// Operator that can sign commitments on behalf of the validator.
+    #[schema(value_type = String)]
     pub(crate) operator: Address,
     /// Gas limit reserved for commitments.
     pub(crate) gas_limit: u64,
     /// The expiry of the registration.
     pub(crate) expiry: u64,
     /// The BLS signature of the validator on the registration.
+    #[schema(value_type = Option<String>)]
     pub(crate) signature: Option<BlsSignature>,
 }
 
 /// A batch deregistration of validators.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct DeregistrationBatch {
     /// Validators being de-registered.
     pub(crate) validator_pubkeys: Vec<BlsPublicKey>,
     /// Not strictly needed, but will determine signature digest.
+    #[schema(value_type = String)]
     pub(crate) operator: Address,
     /// Signatures would be: sign(digest(operator))
+    #[schema(value_type = Vec<String>)]
     pub(crate) signatures: Vec<BlsSignature>,
 }
 
@@ -104,31 +111,39 @@ impl DeregistrationBatch {
 }
 
 /// A single deregistration of a validator.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct Deregistration {
     /// Validator being de-registered.
     pub(crate) validator_pubkey: BlsPublicKey,
     /// Operator that can sign commitments on behalf of the validator.
+    #[schema(value_type = String)]
     pub(crate) operator: Address,
     /// The BLS signature of the validator on the de-registration.
+    #[schema(value_type = String)]
     pub(crate) signature: BlsSignature,
 }
 
 /// An entry in the validator registry.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct RegistryEntry {
     pub(crate) validator_pubkey: BlsPublicKey,
+    #[schema(value_type = String)]
     pub(crate) operator: Address,
     pub(crate) gas_limit: u64,
+    #[schema(value_type = String)]
     pub(crate) rpc_endpoint: Url,
 }
 
 /// An operator in the registry.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct Operator {
+    #[schema(value_type = String)]
     pub(crate) signer: Address,
+    #[schema(value_type = String)]
     pub(crate) rpc_endpoint: Url,
+    #[schema(value_type = Vec<String>)]
     pub(crate) collateral_tokens: Vec<Address>,
+    #[schema(value_type = Vec<u64>)]
     pub(crate) collateral_amounts: Vec<U256>,
 }
 
