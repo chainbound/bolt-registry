@@ -231,7 +231,7 @@ where
         // 10936976: { validator_pubkey: 0x1234, operator: 0x5678, gas_limit: 1000000, rpc_endpoint: https://rpc.example.com }
         // 10936977: { validator_pubkey: 0x9214, operator: 0x5678, gas_limit: 1000000, rpc_endpoint: https://rpc.example.com }
         // 10936978: { validator_pubkey: 0x1983, operator: 0x5678, gas_limit: 1000000, rpc_endpoint: https://rpc.example.com }
-        let mut lookahead = HashMap::new();
+        let mut lookahead = Lookahead::new();
         for duty in proposer_duties {
             let bls_pubkey = BlsPublicKey::from_bytes(&duty.public_key).expect("valid BLS pubkey");
             if let Some(entry) = registry_entries.iter().find(|e| e.validator_pubkey == bls_pubkey)
