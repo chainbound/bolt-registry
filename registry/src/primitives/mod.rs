@@ -3,11 +3,15 @@ use derive_more::derive::{Deref, DerefMut, From};
 use ethereum_consensus::crypto::PublicKey;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
+use utoipa::ToSchema;
 
 pub(crate) mod beacon;
 pub(crate) mod registry;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Deref, DerefMut, From, PartialEq, Eq, Hash)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, Deref, DerefMut, From, PartialEq, Eq, Hash, ToSchema,
+)]
+#[schema(value_type = String)]
 pub(crate) struct BlsPublicKey(bls::PublicKey);
 
 impl BlsPublicKey {

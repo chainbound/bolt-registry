@@ -1,6 +1,8 @@
 //! The API specification for the registry, and its errors. Contains 2 sub-specs: [`ValidatorSpec`]
 //! and [`DiscoverySpec`]. The [`ApiSpec`] trait combines both of these.
 
+use std::time::Duration;
+
 use alloy::primitives::Address;
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
@@ -19,6 +21,9 @@ use crate::{
         BlsPublicKey,
     },
 };
+
+/// The maximum request timeout for Bolt Registry API.
+pub(super) const MAX_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 // validator endpoints
 pub(super) const VALIDATORS_REGISTER_PATH: &str = "/registry/v1/validators/register";
@@ -115,11 +120,11 @@ impl IntoResponse for RegistryError {
 }
 
 fn json_error_response(status: StatusCode, message: &str) -> impl IntoResponse {
-    #[derive(Serialize, Deserialize)]
-    struct ErrorBody<'a> {
-        code: u16,
-        message: &'a str,
-    }
-
     (status, Json(ErrorBody { code: status.as_u16(), message })).into_response()
+}
+
+#[derive(Serialize, Deserialize)]
+struct ErrorBody<'a> {
+    code: u16,
+    message: &'a str,
 }

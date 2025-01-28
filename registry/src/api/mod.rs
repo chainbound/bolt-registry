@@ -4,12 +4,8 @@
 use std::{io, net::SocketAddr, sync::Arc, time::Duration};
 
 use alloy::primitives::Address;
-use axum::{
-    extract::{Path, Query, State},
-    response::IntoResponse,
-    routing::{get, post},
-    Json, Router,
-};
+use axum::routing::{get, post};
+use reqwest::Method;
 use serde::Deserialize;
 use tokio::{
     net::TcpListener,
@@ -19,7 +15,11 @@ use tokio::{
     },
     task::JoinHandle,
 };
+use tower_http::{cors::CorsLayer, timeout::TimeoutLayer, trace::TraceLayer};
 use tracing::error;
+use utoipa::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::primitives::{
     registry::{
@@ -27,6 +27,9 @@ use crate::primitives::{
     },
     BlsPublicKey,
 };
+
+/// API handler functions
+mod handlers;
 
 pub(crate) mod actions;
 use actions::{Action, ActionStream};
@@ -90,16 +93,31 @@ impl RegistryApi {
         let listen_addr = self.cfg.listen_addr;
         let state = Arc::new(self);
 
-        let router = Router::new()
-            .route(VALIDATORS_REGISTER_PATH, post(Self::register))
-            .route(VALIDATORS_DEREGISTER_PATH, post(Self::deregister))
-            .route(VALIDATORS_REGISTRATIONS_PATH, get(Self::get_registrations))
-            .route(DISCOVERY_VALIDATORS_PATH, get(Self::get_validators))
-            .route(DISCOVERY_VALIDATOR_PATH, get(Self::get_validator_by_pubkey))
-            .route(DISCOVERY_OPERATORS_PATH, get(Self::get_operators))
-            .route(DISCOVERY_OPERATOR_PATH, get(Self::get_operator_by_signer))
-            .route(DISCOVERY_LOOKAHEAD_PATH, get(Self::get_lookahead))
-            .with_state(state);
+        // All API routes are defined here:
+        let (router, api_docs) = OpenApiRouter::with_openapi(handlers::ApiDoc::openapi())
+            .route(VALIDATORS_REGISTER_PATH, post(handlers::register))
+            .route(VALIDATORS_DEREGISTER_PATH, post(handlers::deregister))
+            .route(VALIDATORS_REGISTRATIONS_PATH, get(handlers::get_registrations))
+            .route(DISCOVERY_VALIDATORS_PATH, get(handlers::get_validators))
+            .route(DISCOVERY_VALIDATOR_PATH, get(handlers::get_validator_by_pubkey))
+            .route(DISCOVERY_OPERATORS_PATH, get(handlers::get_operators))
+            .route(DISCOVERY_OPERATOR_PATH, get(handlers::get_operator_by_signer))
+            .route(DISCOVERY_LOOKAHEAD_PATH, get(handlers::get_lookahead))
+            .with_state(state)
+            .split_for_parts();
+
+        // This is the final router that includes the API routes,
+        // middlewares and the Swagger UI:
+        let router = router
+            .layer(TraceLayer::new_for_http())
+            .layer(TimeoutLayer::new(spec::MAX_REQUEST_TIMEOUT))
+            .layer(
+                CorsLayer::new()
+                    .allow_origin(tower_http::cors::Any)
+                    .allow_methods([Method::GET, Method::POST])
+                    .allow_headers(tower_http::cors::Any),
+            )
+            .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", api_docs));
 
         let listener = TcpListener::bind(&listen_addr).await?;
 
@@ -108,60 +126,6 @@ impl RegistryApi {
                 error!("API server crashed: {}", err);
             }
         }))
-    }
-
-    async fn register(
-        State(api): State<Arc<Self>>,
-        Json(registration): Json<RegistrationBatch>,
-    ) -> impl IntoResponse {
-        api.register(registration).await
-    }
-
-    async fn deregister(
-        State(api): State<Arc<Self>>,
-        Json(deregistration): Json<DeregistrationBatch>,
-    ) -> impl IntoResponse {
-        api.deregister(deregistration).await
-    }
-
-    async fn get_registrations(State(api): State<Arc<Self>>) -> impl IntoResponse {
-        api.get_registrations().await.map(Json)
-    }
-
-    async fn get_validators(
-        State(api): State<Arc<Self>>,
-        Query(filter): Query<ValidatorFilter>,
-    ) -> impl IntoResponse {
-        match (filter.pubkeys, filter.indices) {
-            (Some(pubkeys), None) => api.get_validators_by_pubkeys(pubkeys).await.map(Json),
-            (None, Some(indices)) => api.get_validators_by_indices(indices).await.map(Json),
-            _ => api.get_validators().await.map(Json),
-        }
-    }
-
-    async fn get_validator_by_pubkey(
-        State(api): State<Arc<Self>>,
-        Path(pubkey): Path<BlsPublicKey>,
-    ) -> impl IntoResponse {
-        api.get_validator_by_pubkey(pubkey).await.map(Json)
-    }
-
-    async fn get_operators(State(api): State<Arc<Self>>) -> impl IntoResponse {
-        api.get_operators().await.map(Json)
-    }
-
-    async fn get_operator_by_signer(
-        State(api): State<Arc<Self>>,
-        Path(signer): Path<Address>,
-    ) -> impl IntoResponse {
-        api.get_operator_by_signer(signer).await.map(Json)
-    }
-
-    async fn get_lookahead(
-        State(api): State<Arc<Self>>,
-        Path(epoch): Path<u64>,
-    ) -> impl IntoResponse {
-        api.get_lookahead(epoch).await.map(Json)
     }
 
     async fn send_action(&self, action: Action) -> Result<(), SendTimeoutError<Action>> {
@@ -244,7 +208,7 @@ impl spec::DiscoverySpec for RegistryApi {
     #[tracing::instrument(skip(self))]
     async fn get_validator_by_pubkey(
         &self,
-        pubkey: crate::primitives::BlsPublicKey,
+        pubkey: BlsPublicKey,
     ) -> Result<RegistryEntry, spec::RegistryError> {
         let (tx, rx) = oneshot::channel();
 

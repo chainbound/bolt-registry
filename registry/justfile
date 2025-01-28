@@ -1,0 +1,8 @@
+default:
+    @just --list --unsorted
+
+# Run the development server locally
+dev loglevel='debug':
+    @echo "Starting bolt-registry in development mode with loglevel: {{loglevel}}"
+    RUST_LOG=bolt_registry={{loglevel}} cargo watch -x run
+
