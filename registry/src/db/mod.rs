@@ -59,8 +59,8 @@ pub(crate) trait SyncTransaction {
 pub(crate) trait RegistryDb: Clone + Send + Sync + 'static {
     type SyncTransaction: SyncTransaction + Send;
 
-    /// Begin a new sync transaction. A sync transaction groups database mutations together in a
-    /// single atomic operation.
+    /// Begin a new sync transaction.
+    /// A sync transaction groups database mutations together in a single atomic operation.
     async fn begin_sync(&self) -> DbResult<Self::SyncTransaction>;
 
     /// Register validators in the database.

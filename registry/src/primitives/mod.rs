@@ -21,6 +21,7 @@ impl BlsPublicKey {
         Ok(Self(bls::PublicKey::deserialize(bytes)?))
     }
 
+    /// Converts the BLS public key to an [`ethereum_consensus::crypto::PublicKey`].
     pub(crate) fn to_consensus(&self) -> PublicKey {
         PublicKey::try_from(self.0.compress().serialize().as_ref()).unwrap()
     }
