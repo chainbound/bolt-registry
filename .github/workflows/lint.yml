@@ -12,29 +12,32 @@ env:
 
 jobs:
   clippy:
-      name: clippy
-      runs-on: ubuntu-latest
-      timeout-minutes: 30
-      steps:
-        - uses: actions/checkout@v4
-        - uses: dtolnay/rust-toolchain@nightly
-          with:
-            components: clippy
-        - uses: Swatinem/rust-cache@v2
-          with:
-            cache-on-failure: true
-        - run: cargo clippy --examples --tests --benches --all-features --locked
-          env:
-            RUSTFLAGS: -D warnings
+    name: clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          workspaces: registry
+      - run: cargo clippy --examples --tests --benches --all-features --locked
+        working-directory: registry
+        env:
+          RUSTFLAGS: -D warnings
 
   fmt:
-      name: fmt
-      runs-on: ubuntu-latest
-      timeout-minutes: 30
-      steps:
-        - uses: actions/checkout@v4
-        - uses: dtolnay/rust-toolchain@nightly
-          with:
-            components: rustfmt
-        - name: Run fmt
-          run: cargo fmt --all --check
+    name: fmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - name: Run fmt
+        run: cargo fmt --all --check
+        working-directory: registry

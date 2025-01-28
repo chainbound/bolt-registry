@@ -3,12 +3,12 @@ name: Registry Contracts CI
 on:
   push:
     paths:
-      - "smart-contracts/**"
+      - "contracts/**"
     branches:
       - main
   pull_request:
     paths:
-      - "smart-contracts/**"
+      - "contracts/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -32,8 +32,8 @@ jobs:
 
       - name: Run tests
         run: forge test --via-ir -vvv
-        working-directory: smart-contracts
+        working-directory: contracts
 
       - name: Run forge fmt
         run: forge fmt --check
-        working-directory: smart-contracts
+        working-directory: contracts

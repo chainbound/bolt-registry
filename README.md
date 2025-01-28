@@ -1,8 +1,20 @@
 # Bolt Registry
 
-## Running Tests
+This repository hosts the code for all the components of the bolt "hybrid registry".
+In essence, it is a system that allows node operators to:
 
-Most of these tests rely on external sources. To run them, you will need to set the following environment variables:
-- `BEACON_URL`: The URL of a beacon node to use for testing.
+1. opt-in to bolt on-chain through a series of smart contracts
+2. provide collateral through restaking protocols integration
+3. manage their validator opt-in status through an off-chain API
 
-If these are not set, the tests will be skipped.
+For more details about bolt, please refer to the [Docs website][docs].
+
+## Repository Structure
+
+- [contracts](./contracts/): The smart contracts for operator registration and restaking integration.
+- [registry](./registry/): The off-chain service for managing validator opt-in status and serving the API.
+- [assets](./assets/): Static assets for storage of metadata.
+
+<!-- links -->
+
+[docs]: https://docs.boltprotocol.xyz
