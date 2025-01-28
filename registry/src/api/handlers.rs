@@ -56,7 +56,7 @@ use super::{
 pub(crate) struct ApiDoc;
 
 /// Registers a new validator.
-#[utoipa::path(post, path = VALIDATORS_REGISTER_PATH, responses(
+#[utoipa::path(post, path = VALIDATORS_REGISTER_PATH, request_body = RegistrationBatch, responses(
     (status = 200, description = "Success")
 ))]
 pub(crate) async fn register(
@@ -67,7 +67,7 @@ pub(crate) async fn register(
 }
 
 /// Deregisters a validator.
-#[utoipa::path(post, path = VALIDATORS_DEREGISTER_PATH, responses(
+#[utoipa::path(post, path = VALIDATORS_DEREGISTER_PATH, request_body = DeregistrationBatch, responses(
     (status = 200, description = "Success")
 ))]
 pub(crate) async fn deregister(
