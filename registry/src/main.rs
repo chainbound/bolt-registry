@@ -5,30 +5,43 @@
 
 //! Entrypoint for the registry server binary.
 
-use client::BeaconClient;
 use eyre::bail;
 use tracing::{info, warn};
 
+/// API server for the registry, implemented by [`RegistryApi`].
+/// Contains all the API spec, routes, docs and handlers.
 mod api;
 use api::{
     actions::{Action, ActionStream},
     ApiConfig, RegistryApi,
 };
 
+/// Various extendable client implementations to communicate
+/// with external services such as Ethereum nodes.
 mod client;
+use client::BeaconClient;
 
+/// Chain input-output interfaces and abstractions.
+mod chainio;
+
+/// Database backends.
 mod db;
 use db::{InMemoryDb, SQLDb};
 
+/// Primitive types and data structures.    
 mod primitives;
 
+/// The main registry server implementation.
 mod registry;
 use registry::Registry;
 
+/// Sources of actions to process.
 mod sources;
 
+/// Syncing logic.
 mod sync;
 
+/// CLI and configuration.
 mod cli;
 
 #[tokio::main]
