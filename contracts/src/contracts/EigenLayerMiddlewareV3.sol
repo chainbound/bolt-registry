@@ -21,12 +21,12 @@ import {IRestakingMiddlewareV1} from "../interfaces/IRestakingMiddlewareV1.sol";
 import {IOperatorsRegistryV1} from "../interfaces/IOperatorsRegistryV1.sol";
 
 /**
- * @title BoltEigenLayerMiddlewareV2
+ * @title BoltEigenLayerMiddlewareV3
  * @author Chainbound Developers <dev@chainbound.io>
  * @notice This contract is responsible for interacting with the EigenLayer restaking protocol contracts. It serves
  *         as AVS contract and implements the IAVSRegistrar interface as well.
  */
-contract EigenLayerMiddlewareV2 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegistrar, IRestakingMiddlewareV1 {
+contract EigenLayerMiddlewareV3 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegistrar, IRestakingMiddlewareV1 {
     using PauseableEnumerableSet for PauseableEnumerableSet.AddressSet;
 
     /// @notice Address of the EigenLayer AVS Directory contract.
@@ -114,14 +114,14 @@ contract EigenLayerMiddlewareV2 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @param _eigenlayerAllocationManager The address of the EigenLayer Allocation Manager contract
     /// @param _eigenlayerDelegationManager The address of the EigenLayer Delegation Manager contract
     /// @param _eigenlayerStrategyManager The address of the EigenLayer Strategy Manager contract
-    function initializeV2(
+    function initializeV3(
         address owner,
         IOperatorsRegistryV1 _operatorsRegistry,
         IAVSDirectory _avsDirectory,
         IAllocationManager _eigenlayerAllocationManager,
         IDelegationManager _eigenlayerDelegationManager,
         IStrategyManager _eigenlayerStrategyManager
-    ) public reinitializer(2) {
+    ) public reinitializer(3) {
         __Ownable_init(owner);
 
         AVS_DIRECTORY = _avsDirectory;
@@ -322,12 +322,9 @@ contract EigenLayerMiddlewareV2 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
         return result;
     }
 
-    /// @notice Get the strategies that an operator can restake in
-    /// @param operator The operator address to get the restakeable strategies for
+    /// @notice Get the strategies that operators can restake in
     /// @return The restakeable strategy addresses
-    function getRestakeableStrategies(
-        address operator
-    ) public view returns (address[] memory) {
+    function getRestakeableStrategies() public view returns (address[] memory) {
         // All operators can use all whitelisted, active strategies.
         IStrategy[] memory strategies = getActiveWhitelistedStrategies();
 
