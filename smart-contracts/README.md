@@ -8,6 +8,8 @@
 
 ## Architecture
 
+![el-middleware-arch](./docs/el-middleware-arch.png)
+
 This is a simplified diagram to understand the architecture of the EigenLayer middleware and how it interacts with the OperatorsRegistry.
 
 In short, when operators wish to opt-in to bolt, they need to register themselves in the `BoltEigenLayerMiddleware` for
@@ -17,8 +19,6 @@ operator is active and has the necessary permissions to opt-in.
 For EigenLayer for instance, the operator can use the `registerForOperatorSets` function on the `AllocationManager` to register
 to the bolt AVS. The middleware will then handle the `IAVSRegistrar.registerOperator()` callback and track the registration
 in the `OperatorsRegistry`'s storage.
-
-![el-middleware-arch](./docs/el-middleware-arch.png)
 
 ## Deployments
 
