@@ -11,8 +11,8 @@ For more details about bolt, please refer to the [Docs website][docs].
 
 ## Repository Structure
 
-- [smart-contracts](./smart-contracts/): The smart contracts for operator registration and restaking integration.
-- [registry-api](./registry-api/): The off-chain API service for managing validator opt-in status.
+- [contracts](./contracts/): The smart contracts for operator registration and restaking integration.
+- [registry](./registry/): The off-chain service for managing validator opt-in status and serving the API.
 - [assets](./assets/): Static assets for storage of metadata.
 
 <!-- links -->
