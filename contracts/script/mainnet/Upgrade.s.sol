@@ -16,13 +16,14 @@ import {IStrategyManager} from "@eigenlayer/src/contracts/interfaces/IStrategyMa
 import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.sol";
 
 import {SymbioticMiddlewareV1} from "../../src/contracts/SymbioticMiddlewareV1.sol";
-import {EigenLayerMiddlewareV1} from "../../src/contracts/EigenLayerMiddlewareV1.sol";
 import {EigenLayerMiddlewareV2} from "../../src/contracts/EigenLayerMiddlewareV2.sol";
+import {EigenLayerMiddlewareV3} from "../../src/contracts/EigenLayerMiddlewareV3.sol";
 import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
 import {IOperatorsRegistryV1} from "../../src/interfaces/IOperatorsRegistryV1.sol";
 
 /// @notice Upgrades any of the OperatorsRegistry, SymbioticMiddleware or EigenLayerMiddleware contracts.
 /// @dev Before running this script, make sure to update the variables in the script correctly.
+/// @dev Don't forget to use --verify flags when running the script to get the verification results.
 /// @dev Use with one of the following commands:
 ///
 /// 1. Upgrade symbiotic middleware:
@@ -77,9 +78,9 @@ contract UpgradeRegistry is Script {
         console.log("Upgrading EigenLayer middleware with admin: %s", admin);
 
         // Note: these variables MUST be updated correctly before each run of this script
-        string memory UPGRADE_FROM = "EigenLayerMiddlewareV1";
+        string memory UPGRADE_FROM = "EigenLayerMiddlewareV2";
         address OLD_PROXY = 0x35DebC00531Ac8771be5dbEf015feFD084efA958;
-        string memory UPGRADE_TO = "EigenLayerMiddlewareV2";
+        string memory UPGRADE_TO = "EigenLayerMiddlewareV3";
 
         console.log("Upgrading EigenLayer middleware from %s to %s", UPGRADE_FROM, UPGRADE_TO);
 
@@ -99,7 +100,7 @@ contract UpgradeRegistry is Script {
         IStrategyManager _eigenlayerStrategyManager = IStrategyManager(0x858646372CC42E1A627fcE94aa7A7033e7CF075A);
 
         bytes memory initBytes = abi.encodeCall(
-            EigenLayerMiddlewareV2.initializeV2,
+            EigenLayerMiddlewareV3.initializeV3,
             (
                 admin, // address owner
                 _operatorsRegistry,
