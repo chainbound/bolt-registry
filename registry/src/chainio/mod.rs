@@ -14,6 +14,6 @@ pub(crate) mod abi {
     sol!(
         #[sol(rpc)]
         EigenLayerMiddleware,
-        "src/chainio/artifacts/EigenLayerMiddlewareV2.json"
+        "src/chainio/artifacts/EigenLayerMiddlewareV3.json"
     );
 }
