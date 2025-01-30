@@ -13,8 +13,6 @@ interface IOperatorsRegistryV2 {
         string rpcEndpoint;
         address restakingMiddleware;
         string extraData;
-        // Field introduced in V2
-        address[] authorizedSigners;
     }
 
     /// @notice Emitted when a new operator is registered

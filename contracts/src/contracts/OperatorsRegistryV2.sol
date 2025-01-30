@@ -132,9 +132,20 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         require(bytes(rpcEndpoint).length > 0, InvalidRpc());
         require(operator != address(0), InvalidOperator());
 
+        for (uint256 i = 0; i < authorizedSigners.length; i++) {
+            require(authorizedSigners[i] != address(0), InvalidSigner());
+        }
+
+        uint48 time = Time.timestamp();
+
         // Consider the operator active from the current timestamp onwards.
-        _operatorAddresses.register(Time.timestamp(), operator);
-        operators[operator] = Operator(operator, rpcEndpoint, msg.sender, extraData, authorizedSigners);
+        _operatorAddresses.register(time, operator);
+        operators[operator] = Operator(operator, rpcEndpoint, msg.sender, extraData);
+
+        // Register the authorized signers as active from the current timestamp onwards.
+        for (uint256 i = 0; i < authorizedSigners.length; i++) {
+            _authorizedSignersByOperator[operator].register(time, authorizedSigners[i]);
+        }
 
         emit OperatorRegistered(operator, rpcEndpoint, msg.sender, extraData, authorizedSigners);
     }
@@ -231,7 +242,7 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         require(_authorizedSignersByOperator[operator].contains(signer), UnknownSigner());
 
         uint48 time = getCurrentEpochStartTimestamp() - 1;
-        _authorizedSignersByOperator[operator].unregister(time, signer);
+        _authorizedSignersByOperator[operator].unregister(time, EPOCH_DURATION, signer);
     }
 
     /// @notice Deregister an operator from the registry
@@ -249,6 +260,7 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         uint48 time = getCurrentEpochStartTimestamp() - 1;
         _operatorAddresses.unregister(time, EPOCH_DURATION, operator);
         delete operators[operator];
+        delete _authorizedSignersByOperator[operator];
 
         emit OperatorDeregistered(operator, msg.sender);
     }
