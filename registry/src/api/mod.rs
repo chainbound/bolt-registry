@@ -31,9 +31,11 @@ use crate::primitives::{
 /// API handler functions
 mod handlers;
 
+/// Actions to process.
 pub(crate) mod actions;
 use actions::{Action, ActionStream};
 
+/// API specification and traits.
 pub(crate) mod spec;
 use spec::{
     DiscoverySpec, ValidatorSpec, DISCOVERY_LOOKAHEAD_PATH, DISCOVERY_OPERATORS_PATH,

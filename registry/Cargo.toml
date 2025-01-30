@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 # rust-version = "1.83"
 exclude = [".github/"]
-authors = ["Chainbound <dev@chainbound.io>"]
+authors = ["Chainbound developers <dev@chainbound.io>"]
 repository = "https://github.com/chainbound/bolt-registry"
 
 # Explicitly set the resolver to version 2, which is the default for packages with edition >= 2021
@@ -35,7 +35,7 @@ axum = "0.8.1"
 sqlx = { version = "0.8", features = ["runtime-tokio", "tls-native-tls", "postgres", "chrono"] }
 
 # ethereum
-alloy = { version = "0.9.1", features = ["consensus", "rpc-types", "reqwest"] }
+alloy = { version = "0.9.1", features = ["consensus", "sol-types", "contract", "json", "rpc-types", "reqwest"] }
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "8fbd8a5" } # Last release in 2022
 beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "8fbd8a5" }  # Last release in 2022
 
