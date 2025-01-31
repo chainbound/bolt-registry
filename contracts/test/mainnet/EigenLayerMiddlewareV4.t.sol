@@ -13,6 +13,7 @@ import {IStrategy} from "@eigenlayer/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "@eigenlayer/src/contracts/interfaces/ISignatureUtils.sol";
 import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.sol";
 import {OperatorSet} from "@eigenlayer/src/contracts/libraries/OperatorSetLib.sol";
+import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
 import {OperatorsRegistryV2} from "../../src/contracts/OperatorsRegistryV2.sol";
 import {IOperatorsRegistryV2} from "../../src/interfaces/IOperatorsRegistryV2.sol";
@@ -215,5 +216,20 @@ contract EigenLayerMiddlewareV4Test is Test {
         (opData, isActive, authSigners) = registry.getOperator(operator);
         // The authorized signer should be paused immediately and will not show up in the authorized signers list
         assertEq(authSigners.length, 0);
+
+        // 8. try to unpause the authorized signer and check its status again
+        // this should fail because the operator needs to wait for the next epoch to
+        // be able to unpause the authorized signer again
+        vm.prank(operator);
+        vm.expectRevert(PauseableEnumerableSet.ImmutablePeriodNotPassed.selector);
+        registry.unpauseOperatorAuthorizedSigner(authorizedSigner);
+
+        // 9. wait for the next epoch and try to unpause the authorized signer again
+        vm.warp(block.timestamp + 1 days);
+        vm.prank(operator);
+        registry.unpauseOperatorAuthorizedSigner(authorizedSigner);
+        (opData, isActive, authSigners) = registry.getOperator(operator);
+        assertEq(authSigners.length, authorizedSigners.length);
+        assertEq(authSigners[0], authorizedSigner);
     }
 }

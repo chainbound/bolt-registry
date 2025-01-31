@@ -192,7 +192,9 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
 
     /// @notice Update the rpc endpoint of an operator
     /// @param newRpcEndpoint The new rpc endpoint
-    function updateOperatorRpcEndpoint(string memory newRpcEndpoint) public {
+    function updateOperatorRpcEndpoint(
+        string memory newRpcEndpoint
+    ) public {
         address operator = msg.sender;
 
         require(_operatorAddresses.contains(operator), UnknownOperator());
@@ -203,7 +205,9 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
 
     /// @notice Add an authorized signer to an operator
     /// @param signer The address of the new authorized signer
-    function addOperatorAuthorizedSigner(address signer) public {
+    function addOperatorAuthorizedSigner(
+        address signer
+    ) public {
         address operator = msg.sender;
 
         require(_operatorAddresses.contains(operator), UnknownOperator());
@@ -216,7 +220,9 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
 
     /// @notice Pause an authorized signer from an operator
     /// @param signer The address of the signer
-    function pauseOperatorAuthorizedSigner(address signer) public {
+    function pauseOperatorAuthorizedSigner(
+        address signer
+    ) public {
         address operator = msg.sender;
 
         require(_operatorAddresses.contains(operator), UnknownOperator());
@@ -231,7 +237,9 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
 
     /// @notice Unpause an authorized signer from an operator
     /// @param signer The address of the signer
-    function unpauseOperatorAuthorizedSigner(address signer) public {
+    function unpauseOperatorAuthorizedSigner(
+        address signer
+    ) public {
         address operator = msg.sender;
 
         require(_operatorAddresses.contains(operator), UnknownOperator());
@@ -243,7 +251,9 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
 
     /// @notice Remove an authorized signer from an operator
     /// @param signer The address of the signer
-    function removeOperatorAuthorizedSigner(address signer) public {
+    function removeOperatorAuthorizedSigner(
+        address signer
+    ) public {
         address operator = msg.sender;
 
         require(_operatorAddresses.contains(operator), UnknownOperator());

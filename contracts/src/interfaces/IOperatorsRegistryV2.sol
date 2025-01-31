@@ -72,7 +72,9 @@ interface IOperatorsRegistryV2 {
 
     /// @notice Update the rpc endpoint of an operator
     /// @param rpcEndpoint The new rpc endpoint
-    function updateOperatorRpcEndpoint(string memory rpcEndpoint) external;
+    function updateOperatorRpcEndpoint(
+        string memory rpcEndpoint
+    ) external;
 
     /// @notice Pause an operator in the registry
     /// @param operator The address of the operator
