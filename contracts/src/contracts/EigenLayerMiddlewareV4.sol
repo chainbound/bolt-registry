@@ -131,14 +131,6 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
 
     // ========= AVS functions ========= //
 
-    /// @notice Update the RPC endpoint of the operator
-    /// @param rpcEndpoint The new RPC endpoint
-    function updateOperatorRpcEndpoint(
-        string calldata rpcEndpoint
-    ) public {
-        OPERATORS_REGISTRY.updateOperatorRpcEndpoint(msg.sender, rpcEndpoint);
-    }
-
     /// @notice Get the collaterals and amounts staked by an operator across the whitelisted strategies
     /// @param operator The operator address to get the collaterals and amounts staked for
     /// @return collaterals The collaterals staked by the operator
@@ -194,6 +186,8 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
         return activeStake;
     }
 
+    // ========= Strategy queries ========= //
+
     /// @notice Get all whitelisted strategies for this AVS, including inactive ones.
     /// @return The list of whitelisted strategies
     function getWhitelistedStrategies() public view returns (address[] memory) {
@@ -233,7 +227,6 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @notice Register an operator through the AVS Directory
     /// @param rpcEndpoint The RPC URL of the operator
     /// @param extraData Arbitrary data the operator can provide as part of registration
-    /// @param operator The address of the operator being registered
     /// @param operatorSignature The signature of the operator
     /// @param authorizedSigners The addresses authorized to sign commitment on behalf of the operator.
     /// @dev This function is used before the ELIP-002 (slashing) EigenLayer upgrade to register operators.
@@ -241,10 +234,11 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     function registerOperatorToAVS(
         string memory rpcEndpoint,
         string memory extraData,
-        address operator,
         ISignatureUtils.SignatureWithSaltAndExpiry calldata operatorSignature,
         address[] memory authorizedSigners
     ) public {
+        address operator = msg.sender;
+
         require(DELEGATION_MANAGER.isOperator(operator), NotOperator());
 
         // The operator signature is checked in the AVS Directory contract
@@ -253,12 +247,11 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     }
 
     /// @notice Deregister an operator through the AVS Directory
-    /// @param operator The address of the operator being deregistered
     /// @dev This function is used before the ELIP-002 (slashing) EigenLayer upgrade to deregister operators.
     /// @dev Operators must use this function to deregister before the upgrade. After the upgrade, this will be removed.
-    function deregisterOperatorFromAVS(
-        address operator
-    ) public {
+    function deregisterOperatorFromAVS() public {
+        address operator = msg.sender;
+
         require(DELEGATION_MANAGER.isOperator(operator), NotOperator());
 
         AVS_DIRECTORY.deregisterOperatorFromAVS(operator);

@@ -102,21 +102,7 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         return START_TIMESTAMP + currentEpoch * EPOCH_DURATION;
     }
 
-    /// @notice Returns the timestamp of when the next epoch starts
-    /// @return timestamp The timestamp of the next epoch start
-    function getNextEpochStartTimestamp() public view returns (uint48) {
-        return getCurrentEpochStartTimestamp() + EPOCH_DURATION;
-    }
-
-    // ========= Operators functions ========= //
-    //
-    // The operator lifecycle looks as follows:
-    // 1. Register, and become active immediately. The operator can then manage their
-    //    restaking positions through the restaking protocol.
-    // 2. Pause, and become inactive. After a delay, the operator won't be slashable anymore,
-    //    but they can still manage and rebalance their positions.
-    // 3. Unpause, and become active again. After a delay, the operator can be slashed again.
-    // 4. Deregister, and become inactive. After a delay, the operator won't be part of the AVS anymore.
+    // ========= Operators lifecycle functions ========= //
 
     /// @notice Register an operator in the registry
     /// @param operator The address of the operator
@@ -148,6 +134,26 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         }
 
         emit OperatorRegistered(operator, rpcEndpoint, msg.sender, extraData, authorizedSigners);
+    }
+
+    /// @notice Deregister an operator from the registry
+    /// @param operator The address of the operator
+    /// @dev Only restaking middleware contracts can call this function
+    /// @dev Operators need to be paused and wait for EPOCH_DURATION() before they can be deregistered.
+    function deregisterOperator(
+        address operator
+    ) external onlyMiddleware {
+        require(_operatorAddresses.contains(operator), UnknownOperator());
+
+        // NOTE: we use the current epoch start timestamp - 1 to ensure that the operator is deregistered
+        // at the end of the current epoch. If we didn't do this, we would have to wait until the next
+        // epoch until the operator was actually deregistered.
+        uint48 time = getCurrentEpochStartTimestamp() - 1;
+        _operatorAddresses.unregister(time, EPOCH_DURATION, operator);
+        delete operators[operator];
+        delete _authorizedSignersByOperator[operator];
+
+        emit OperatorDeregistered(operator, msg.sender);
     }
 
     /// @notice Pause an operator in the registry
@@ -182,11 +188,13 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         emit OperatorUnpaused(operator, msg.sender);
     }
 
+    // ========= Operator settings functions ========= //
+
     /// @notice Update the rpc endpoint of an operator
-    /// @param operator The address of the operator
     /// @param newRpcEndpoint The new rpc endpoint
-    /// @dev Only restaking middleware contracts can call this function
-    function updateOperatorRpcEndpoint(address operator, string memory newRpcEndpoint) external onlyMiddleware {
+    function updateOperatorRpcEndpoint(string memory newRpcEndpoint) public {
+        address operator = msg.sender;
+
         require(_operatorAddresses.contains(operator), UnknownOperator());
         require(bytes(newRpcEndpoint).length > 0, InvalidRpc());
 
@@ -194,10 +202,10 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
     }
 
     /// @notice Add an authorized signer to an operator
-    /// @param operator The address of the operator
     /// @param signer The address of the new authorized signer
-    /// @dev Only restaking middleware contracts can call this function
-    function addOperatorAuthorizedSigner(address operator, address signer) external onlyMiddleware {
+    function addOperatorAuthorizedSigner(address signer) public {
+        address operator = msg.sender;
+
         require(_operatorAddresses.contains(operator), UnknownOperator());
         require(signer != address(0), InvalidSigner());
 
@@ -207,10 +215,10 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
     }
 
     /// @notice Pause an authorized signer from an operator
-    /// @param operator The address of the operator
     /// @param signer The address of the signer
-    /// @dev Only restaking middleware contracts can call this function
-    function pauseOperatorAuthorizedSigner(address operator, address signer) external onlyMiddleware {
+    function pauseOperatorAuthorizedSigner(address signer) public {
+        address operator = msg.sender;
+
         require(_operatorAddresses.contains(operator), UnknownOperator());
         require(_authorizedSignersByOperator[operator].contains(signer), UnknownSigner());
 
@@ -222,10 +230,10 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
     }
 
     /// @notice Unpause an authorized signer from an operator
-    /// @param operator The address of the operator
     /// @param signer The address of the signer
-    /// @dev Only restaking middleware contracts can call this function
-    function unpauseOperatorAuthorizedSigner(address operator, address signer) external onlyMiddleware {
+    function unpauseOperatorAuthorizedSigner(address signer) public {
+        address operator = msg.sender;
+
         require(_operatorAddresses.contains(operator), UnknownOperator());
         require(_authorizedSignersByOperator[operator].contains(signer), UnknownSigner());
 
@@ -234,10 +242,10 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
     }
 
     /// @notice Remove an authorized signer from an operator
-    /// @param operator The address of the operator
     /// @param signer The address of the signer
-    /// @dev Only restaking middleware contracts can call this function
-    function removeOperatorAuthorizedSigner(address operator, address signer) external onlyMiddleware {
+    function removeOperatorAuthorizedSigner(address signer) public {
+        address operator = msg.sender;
+
         require(_operatorAddresses.contains(operator), UnknownOperator());
         require(_authorizedSignersByOperator[operator].contains(signer), UnknownSigner());
 
@@ -245,25 +253,7 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         _authorizedSignersByOperator[operator].unregister(time, EPOCH_DURATION, signer);
     }
 
-    /// @notice Deregister an operator from the registry
-    /// @param operator The address of the operator
-    /// @dev Only restaking middleware contracts can call this function
-    /// @dev Operators need to be paused and wait for EPOCH_DURATION() before they can be deregistered.
-    function deregisterOperator(
-        address operator
-    ) external onlyMiddleware {
-        require(_operatorAddresses.contains(operator), UnknownOperator());
-
-        // NOTE: we use the current epoch start timestamp - 1 to ensure that the operator is deregistered
-        // at the end of the current epoch. If we didn't do this, we would have to wait until the next
-        // epoch until the operator was actually deregistered.
-        uint48 time = getCurrentEpochStartTimestamp() - 1;
-        _operatorAddresses.unregister(time, EPOCH_DURATION, operator);
-        delete operators[operator];
-        delete _authorizedSignersByOperator[operator];
-
-        emit OperatorDeregistered(operator, msg.sender);
-    }
+    // ========= Operator queries ========= //
 
     /// @notice Returns all the operators saved in the registry, including inactive ones.
     /// @return operators The array of operators
@@ -357,7 +347,7 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         }
     }
 
-    // ========= Restaking Middlewres ========= //
+    // ========= Restaking Middleware functions ========= //
 
     /// @notice Update the address of a restaking middleware contract address
     /// @param restakingProtocol The name of the restaking protocol
@@ -378,6 +368,8 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
             revert InvalidMiddleware("Unknown restaking protocol, want EIGENLAYER or SYMBIOTIC");
         }
     }
+
+    // ========= Private helpers ========= //
 
     /// @notice Check if a map entry was active at a given timestamp.
     /// @param enabledTime The enabled time of the map entry.

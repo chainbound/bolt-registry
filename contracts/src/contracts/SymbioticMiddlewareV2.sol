@@ -171,14 +171,6 @@ contract SymbioticMiddlewareV2 is IRestakingMiddlewareV1, OwnableUpgradeable, UU
         // of a pending penalty that the operator is trying to avoid.
     }
 
-    /// @notice Update your RPC endpoint as an operator.
-    /// @param rpcEndpoint The new rpc endpoint.
-    function updateOperatorRpcEndpoint(
-        string calldata rpcEndpoint
-    ) public {
-        OPERATORS_REGISTRY.updateOperatorRpcEndpoint(msg.sender, rpcEndpoint);
-    }
-
     // ================ OPERATOR VIEW METHODS =================== //
 
     /// @notice Gets the operator stake for the vault.

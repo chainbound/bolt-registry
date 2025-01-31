@@ -71,10 +71,8 @@ interface IOperatorsRegistryV2 {
     ) external;
 
     /// @notice Update the rpc endpoint of an operator
-    /// @param operator The address of the operator
     /// @param rpcEndpoint The new rpc endpoint
-    /// @dev Only restaking middleware contracts can call this function
-    function updateOperatorRpcEndpoint(address operator, string memory rpcEndpoint) external;
+    function updateOperatorRpcEndpoint(string memory rpcEndpoint) external;
 
     /// @notice Pause an operator in the registry
     /// @param operator The address of the operator
