@@ -232,4 +232,26 @@ contract EigenLayerMiddlewareV4Test is Test {
         assertEq(authSigners.length, authorizedSigners.length);
         assertEq(authSigners[0], authorizedSigner);
     }
+
+    function testPauseUnpauseOperator() public {
+        address[] memory authorizedSigners = new address[](1);
+        authorizedSigners[0] = authorizedSigner;
+
+        // 1. register the operator
+        _registerOperator(operator, "http://stopjava.com", "operator1", authorizedSigners);
+
+        // 2. pause the operator by deregistering it from the AVS
+        vm.prank(operator);
+        middleware.deregisterOperatorFromAVS();
+
+        // 3. check that the operator is paused immediately
+        (IOperatorsRegistryV2.Operator memory opData, bool isActive, address[] memory authSigners) =
+            registry.getOperator(operator);
+        assertEq(isActive, false);
+
+        // 4. try to unpause the operator and check that it fails
+        vm.prank(operator);
+        vm.expectRevert(PauseableEnumerableSet.ImmutablePeriodNotPassed.selector);
+        middleware.unpauseOperator();
+    }
 }

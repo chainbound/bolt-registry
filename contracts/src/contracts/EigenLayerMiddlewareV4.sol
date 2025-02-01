@@ -186,6 +186,14 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
         return activeStake;
     }
 
+    /// @notice Unpause an operator
+    /// @dev This function is used to unpause an operator that has been paused
+    function unpauseOperator() public {
+        address operator = msg.sender;
+
+        OPERATORS_REGISTRY.unpauseOperator(operator);
+    }
+
     // ========= Strategy queries ========= //
 
     /// @notice Get all whitelisted strategies for this AVS, including inactive ones.
