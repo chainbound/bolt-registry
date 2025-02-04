@@ -13,10 +13,11 @@ import {IStrategy} from "@eigenlayer/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "@eigenlayer/src/contracts/interfaces/ISignatureUtils.sol";
 import {IAVSDirectory} from "@eigenlayer/src/contracts/interfaces/IAVSDirectory.sol";
 import {OperatorSet} from "@eigenlayer/src/contracts/libraries/OperatorSetLib.sol";
+import {PauseableEnumerableSet} from "@symbiotic/middleware-sdk/libraries/PauseableEnumerableSet.sol";
 
-import {OperatorsRegistryV1} from "../../src/contracts/OperatorsRegistryV1.sol";
-import {IOperatorsRegistryV1} from "../../src/interfaces/IOperatorsRegistryV1.sol";
-import {EigenLayerMiddlewareV1} from "../../src/contracts/EigenLayerMiddlewareV1.sol";
+import {OperatorsRegistryV2} from "../../src/contracts/OperatorsRegistryV2.sol";
+import {IOperatorsRegistryV2} from "../../src/interfaces/IOperatorsRegistryV2.sol";
+import {EigenLayerMiddlewareV4} from "../../src/contracts/EigenLayerMiddlewareV4.sol";
 
 // This is needed because the registerAsOperator function has changed in ELIP-002
 // and we need to manually call it with the pre-ELIP-002 parameters
@@ -33,14 +34,15 @@ interface IDelegationManagerPreELIP002 {
     ) external;
 }
 
-contract EigenLayerMiddlewareV1MainnetTest is Test {
-    OperatorsRegistryV1 registry;
-    EigenLayerMiddlewareV1 middleware;
+contract EigenLayerMiddlewareV4MainnetTest is Test {
+    OperatorsRegistryV2 registry;
+    EigenLayerMiddlewareV4 middleware;
 
     address admin;
     address staker;
     address operator;
     uint256 operatorSk;
+    address authorizedSigner;
 
     IDelegationManager mainnetDelegationManager = IDelegationManager(0x39053D51B77DC0d36036Fc1fCc8Cb819df8Ef37A);
     IStrategyManager mainnetStrategyManager = IStrategyManager(0x858646372CC42E1A627fcE94aa7A7033e7CF075A);
@@ -59,15 +61,16 @@ contract EigenLayerMiddlewareV1MainnetTest is Test {
         admin = makeAddr("admin");
         staker = makeAddr("staker");
         (operator, operatorSk) = makeAddrAndKey("operator");
+        authorizedSigner = makeAddr("authorizedSigner");
 
         vm.startPrank(admin);
 
         // --- Deploy the OperatorsRegistry ---
-        registry = new OperatorsRegistryV1();
+        registry = new OperatorsRegistryV2();
         registry.initialize(admin, 1 days);
 
         // --- Deploy the EL middleware ---
-        middleware = new EigenLayerMiddlewareV1();
+        middleware = new EigenLayerMiddlewareV4();
         middleware.initialize(
             admin,
             registry,
@@ -104,7 +107,12 @@ contract EigenLayerMiddlewareV1MainnetTest is Test {
     }
 
     /// Helper function to register an operator
-    function _registerOperator(address signer, string memory rpcEndpoint, string memory extraData) public {
+    function _registerOperator(
+        address signer,
+        string memory rpcEndpoint,
+        string memory extraData,
+        address[] memory authorizedSigners
+    ) public {
         // 1. Register the new EL operator in DelegationManager
         // manually call the registerAsOperator function with the pre-ELIP-002 parameters
         address earningsReceiver = address(1);
@@ -140,20 +148,25 @@ contract EigenLayerMiddlewareV1MainnetTest is Test {
             ISignatureUtils.SignatureWithSaltAndExpiry(operatorRawSignature, bytes32(0), UINT256_MAX);
 
         vm.prank(signer);
-        middleware.registerOperatorToAVS(rpcEndpoint, extraData, operatorSignature);
+        middleware.registerOperatorToAVS(rpcEndpoint, extraData, operatorSignature, authorizedSigners);
 
         vm.warp(block.timestamp + 1 days);
 
-        (IOperatorsRegistryV1.Operator memory opData, bool isActive) = registry.getOperator(signer);
+        (IOperatorsRegistryV2.Operator memory opData, bool isActive, address[] memory authSigners) =
+            registry.getOperator(signer);
         assertEq(opData.signer, signer);
         assertEq(opData.rpcEndpoint, rpcEndpoint);
         assertEq(opData.extraData, extraData);
         assertEq(opData.restakingMiddleware, address(middleware));
         assertEq(isActive, true);
+        assertEq(authSigners.length, authorizedSigners.length);
     }
 
     function testRegister() public {
-        _registerOperator(operator, "http://stopjava.com", "operator1");
+        address[] memory authorizedSigners = new address[](1);
+        authorizedSigners[0] = operator;
+
+        _registerOperator(operator, "http://stopjava.com", "operator1", authorizedSigners);
     }
 
     function testRegisterAndDepositCollateral() public {
@@ -170,7 +183,9 @@ contract EigenLayerMiddlewareV1MainnetTest is Test {
         assertEq(mainnetCbEthStrategy.sharesToUnderlyingView(shares), 99_999_999_999_999_999_999);
 
         // 2. Register the operator in both EL and the bolt AVS
-        _registerOperator(operator, "http://stopjava.com", "operator1");
+        address[] memory authorizedSigners = new address[](1);
+        authorizedSigners[0] = authorizedSigner;
+        _registerOperator(operator, "http://stopjava.com", "operator1", authorizedSigners);
 
         // 3. Delegate funds from the staker to the operator
         vm.prank(staker);
@@ -188,5 +203,124 @@ contract EigenLayerMiddlewareV1MainnetTest is Test {
         assertEq(amounts.length, 1);
         assertEq(collaterals[0], address(mainnetCbEth));
         assertEq(amounts[0], 99_999_999_999_999_999_999);
+
+        // 6. try to read the authorized signers
+        (IOperatorsRegistryV2.Operator memory opData, bool isActive, address[] memory authSigners) =
+            registry.getOperator(operator);
+        assertEq(authSigners.length, authorizedSigners.length);
+        assertEq(authSigners[0], authorizedSigner);
+
+        // 7. try to pause the authorized signer and check its status again
+        vm.prank(operator);
+        registry.pauseOperatorAuthorizedSigner(authorizedSigner);
+        (opData, isActive, authSigners) = registry.getOperator(operator);
+        // The authorized signer should not be paused immediately, but rather in 1 epoch
+        assertEq(authSigners.length, authorizedSigners.length);
+        assertEq(authSigners[0], authorizedSigner);
+
+        // 8. try to unpause the authorized signer and check its status again
+        // this should fail because the operator needs to wait for the next epoch to
+        // be able to unpause the authorized signer again
+        vm.prank(operator);
+        vm.expectRevert(PauseableEnumerableSet.ImmutablePeriodNotPassed.selector);
+        registry.unpauseOperatorAuthorizedSigner(authorizedSigner);
+
+        // 9. wait for 1 epoch and check the status
+        vm.warp(block.timestamp + 1 days);
+        (opData, isActive, authSigners) = registry.getOperator(operator);
+        assertEq(authSigners.length, 0);
+
+        // 10. try to unpause the authorized signer again. it will be unpaused in 1 epoch
+        vm.prank(operator);
+        registry.unpauseOperatorAuthorizedSigner(authorizedSigner);
+        (opData, isActive, authSigners) = registry.getOperator(operator);
+        assertEq(authSigners.length, 0);
+
+        // 11. wait more than 1 epoch and check the status again
+        vm.warp(block.timestamp + 1 days + 1);
+        (opData, isActive, authSigners) = registry.getOperator(operator);
+        assertEq(authSigners.length, authorizedSigners.length);
+        assertEq(authSigners[0], authorizedSigner);
+    }
+
+    function testPauseUnpauseOperator() public {
+        address[] memory authorizedSigners = new address[](1);
+        authorizedSigners[0] = authorizedSigner;
+
+        // 1. register the operator
+        _registerOperator(operator, "http://stopjava.com", "operator1", authorizedSigners);
+
+        // 2. pause the operator by deregistering it from the AVS
+        vm.prank(operator);
+        middleware.deregisterOperatorFromAVS();
+
+        // 3. check that the operator is still active for 1 epoch
+        (IOperatorsRegistryV2.Operator memory opData, bool isActive, address[] memory authSigners) =
+            registry.getOperator(operator);
+        assertEq(isActive, true);
+
+        // 4. try to unpause the operator and check that it fails
+        vm.prank(operator);
+        vm.expectRevert(PauseableEnumerableSet.ImmutablePeriodNotPassed.selector);
+        middleware.unpauseOperator();
+
+        // 5. wait for more than 1 epoch and check the status
+        vm.warp(block.timestamp + 1 days + 1);
+        (opData, isActive, authSigners) = registry.getOperator(operator);
+        assertEq(isActive, false);
+
+        // 6. try to unpause the operator again. it should now succeed
+        // but the operator should still be paused for 1 epoch
+        vm.prank(operator);
+        middleware.unpauseOperator();
+        (opData, isActive, authSigners) = registry.getOperator(operator);
+        assertEq(isActive, false);
+
+        // 7. wait more than 1 epoch and check the status again
+        vm.warp(block.timestamp + 1 days + 2);
+        (opData, isActive, authSigners) = registry.getOperator(operator);
+        assertEq(isActive, true);
+    }
+
+    function testPauseUnpauseOperatorSigner() public {
+        address[] memory authorizedSigners = new address[](1);
+        authorizedSigners[0] = authorizedSigner;
+
+        // 1. register the operator
+        _registerOperator(operator, "http://stopjava.com", "operator1", authorizedSigners);
+        
+        // 2. pause the authorized signer
+        vm.prank(operator);
+        registry.pauseOperatorAuthorizedSigner(authorizedSigner);
+
+        // 3. check that the signer is still active for 1 epoch
+        (IOperatorsRegistryV2.Operator memory opData, bool isActive, address[] memory authSigners) = 
+            registry.getOperator(operator);
+        assertEq(isActive, true);
+        assertEq(authSigners.length, 1);
+        assertEq(authSigners[0], authorizedSigner);
+
+        // 4. try to unpause the signer and check that it fails
+        vm.prank(operator);
+        vm.expectRevert(PauseableEnumerableSet.ImmutablePeriodNotPassed.selector);
+        registry.unpauseOperatorAuthorizedSigner(authorizedSigner);
+
+        // 5. wait for 1 epoch and check the status
+        vm.warp(block.timestamp + 1 days);
+        (opData, isActive, authSigners) = registry.getOperator(operator);
+        assertEq(authSigners.length, 0);
+
+        // 6. try to unpause the signer again. it should now succeed
+        // and the signer should be active again in 1 epoch
+        vm.prank(operator);
+        registry.unpauseOperatorAuthorizedSigner(authorizedSigner);
+        (opData, isActive, authSigners) = registry.getOperator(operator);
+        assertEq(authSigners.length, 0);
+
+        // 7. wait more than 1 epoch and check the status again
+        vm.warp(block.timestamp + 1 days + 1);
+        (opData, isActive, authSigners) = registry.getOperator(operator);
+        assertEq(authSigners.length, 1);
+        assertEq(authSigners[0], authorizedSigner);
     }
 }

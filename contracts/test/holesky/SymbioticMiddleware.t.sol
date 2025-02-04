@@ -21,7 +21,7 @@ import {Subnetwork} from "@symbiotic/core/contracts/libraries/Subnetwork.sol";
 
 import {IERC20} from "@openzeppelin-v4.9.0/contracts/interfaces/IERC20.sol";
 
-contract SymbioticMiddlewareHoleskyTest is Test {
+contract SymbioticMiddlewareV1HoleskyTest is Test {
     using Subnetwork for address;
 
     uint48 EPOCH_DURATION = 1 days;

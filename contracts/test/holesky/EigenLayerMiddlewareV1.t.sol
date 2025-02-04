@@ -20,7 +20,7 @@ import {IOperatorsRegistryV1} from "../../src/interfaces/IOperatorsRegistryV1.so
 import {EigenLayerMiddlewareV1} from "../../src/contracts/EigenLayerMiddlewareV1.sol";
 import {IWETH} from "../util/IWETH.sol";
 
-contract EigenLayerMiddlewareV1Test is Test {
+contract EigenLayerMiddlewareV1HoleskyTest is Test {
     OperatorsRegistryV1 registry;
     EigenLayerMiddlewareV1 middleware;
 
