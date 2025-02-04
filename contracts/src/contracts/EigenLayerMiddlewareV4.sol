@@ -138,8 +138,9 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     function getOperatorCollaterals(
         address operator
     ) public view returns (address[] memory, uint256[] memory) {
-        // Only take strategies that are active at <timestamp>
-        IStrategy[] memory activeStrategies = _getActiveStrategiesAt(_now());
+        // Only take strategies that are currently active
+        uint48 time = Time.timestamp();
+        IStrategy[] memory activeStrategies = _getActiveStrategiesAt(time);
 
         address[] memory collateralTokens = new address[](activeStrategies.length);
         uint256[] memory amounts = new uint256[](activeStrategies.length);
@@ -161,11 +162,14 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @param collateral The collateral token address
     /// @return The amount staked by the operator for the collateral
     function getOperatorStake(address operator, address collateral) public view returns (uint256) {
+        // Only take strategies that are currently active
+        uint48 time = Time.timestamp();
+
         uint256 activeStake = 0;
         for (uint256 i = 0; i < _strategyWhitelist.length(); i++) {
             (address strategy, uint48 enabledAt, uint48 disabledAt) = _strategyWhitelist.at(i);
 
-            if (!_wasEnabledAt(enabledAt, disabledAt, _now())) {
+            if (!_wasEnabledAt(enabledAt, disabledAt, time)) {
                 continue;
             }
 
@@ -211,8 +215,9 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @notice Get the active strategies for this AVS
     /// @return The active strategies
     function getActiveWhitelistedStrategies() public view returns (IStrategy[] memory) {
-        // Use the beginning of the current epoch to check which strategies were enabled at that time.
-        return _getActiveStrategiesAt(_now());
+        // get the strategies that are currently active
+        uint48 time = Time.timestamp(); 
+        return _getActiveStrategiesAt(time);
     }
 
     /// @notice Get the number of whitelisted strategies for this AVS.
@@ -227,7 +232,8 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     function isStrategyActive(
         address strategy
     ) public view returns (bool) {
-        return _strategyWhitelist.wasActiveAt(_now(), strategy);
+        uint48 time = Time.timestamp();
+        return _strategyWhitelist.wasActiveAt(time, strategy);
     }
 
     // ========= [pre-ELIP-002] IServiceManager functions ========= //
@@ -285,8 +291,9 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     function getOperatorRestakedStrategies(
         address operator
     ) public view returns (address[] memory) {
-        // Only take strategies that are active at <timestamp>
-        IStrategy[] memory activeStrategies = _getActiveStrategiesAt(_now());
+        // get the strategies that are currently active
+        uint48 time = Time.timestamp();
+        IStrategy[] memory activeStrategies = _getActiveStrategiesAt(time);
 
         address[] memory restakedStrategies = new address[](activeStrategies.length);
 
@@ -373,7 +380,8 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
         require(!_strategyWhitelist.contains(strategy), StrategyAlreadyWhitelisted());
         require(STRATEGY_MANAGER.strategyIsWhitelistedForDeposit(IStrategy(strategy)), UnauthorizedStrategy());
 
-        _strategyWhitelist.register(_now(), strategy);
+        uint48 time = Time.timestamp();
+        _strategyWhitelist.register(time, strategy);
         emit StrategyWhitelisted(strategy);
     }
 
@@ -384,9 +392,10 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     ) public onlyOwner {
         require(_strategyWhitelist.contains(strategy), UnauthorizedStrategy());
 
-        // NOTE: we use _now() - 1 to ensure that the strategy is paused in the current epoch.
-        // If we didn't do this, we would have to wait until the next epoch until the strategy was actually paused.
-        _strategyWhitelist.pause(_now() - 1, strategy);
+        // Pause the strategy at the end of the current epoch.
+        // Strategies are still considered active until the start of the next epoch.
+        uint48 time = OPERATORS_REGISTRY.getCurrentEpochStartTimestamp() - 1;
+        _strategyWhitelist.pause(time, strategy);
         emit StrategyPaused(strategy);
     }
 
@@ -397,7 +406,10 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     ) public onlyOwner {
         require(_strategyWhitelist.contains(strategy), UnauthorizedStrategy());
 
-        _strategyWhitelist.unpause(_now(), OPERATORS_REGISTRY.EPOCH_DURATION(), strategy);
+        // Unpause the strategy at the start of the next epoch.
+        // Strategies are still considered paused until the end of the current epoch.
+        uint48 time = OPERATORS_REGISTRY.getCurrentEpochStartTimestamp() - 1;
+        _strategyWhitelist.unpause(time, OPERATORS_REGISTRY.EPOCH_DURATION(), strategy);
         emit StrategyUnpaused(strategy);
     }
 
@@ -409,8 +421,10 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     ) public onlyOwner {
         require(_strategyWhitelist.contains(strategy), UnauthorizedStrategy());
 
-        // NOTE: we use _now() - 1 to ensure that the strategy is removed in the current epoch.
-        _strategyWhitelist.unregister(_now() - 1, OPERATORS_REGISTRY.EPOCH_DURATION(), strategy);
+        // Remove the strategy in 1 epoch
+        // Strategies must be paused for at least 1 epoch before they can be removed
+        uint48 time = Time.timestamp();
+        _strategyWhitelist.unregister(time, OPERATORS_REGISTRY.EPOCH_DURATION(), strategy);
         emit StrategyRemoved(strategy);
     }
 
@@ -527,11 +541,5 @@ contract EigenLayerMiddlewareV4 is OwnableUpgradeable, UUPSUpgradeable, IAVSRegi
     /// @return True if the map entry was active at the given timestamp, false otherwise.
     function _wasEnabledAt(uint48 enabledAt, uint48 disabledAt, uint48 timestamp) internal pure returns (bool) {
         return enabledAt != 0 && enabledAt <= timestamp && (disabledAt == 0 || disabledAt >= timestamp);
-    }
-
-    /// @notice Returns the timestamp of the current epoch.
-    /// @return timestamp The current epoch timestamp.
-    function _now() internal view returns (uint48) {
-        return OPERATORS_REGISTRY.getCurrentEpochStartTimestamp();
     }
 }

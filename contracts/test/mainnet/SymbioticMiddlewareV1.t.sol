@@ -22,7 +22,7 @@ import {Subnetwork} from "@symbiotic/core/contracts/libraries/Subnetwork.sol";
 
 import {IERC20} from "@openzeppelin-v4.9.0/contracts/interfaces/IERC20.sol";
 
-contract SymbioticMiddlewareMainnetTest is Test {
+contract SymbioticMiddlewareV1MainnetTest is Test {
     using Subnetwork for address;
 
     uint48 EPOCH_DURATION = 1 days;

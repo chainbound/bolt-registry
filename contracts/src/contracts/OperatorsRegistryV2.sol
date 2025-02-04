@@ -145,10 +145,9 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
     ) external onlyMiddleware {
         require(_operatorAddresses.contains(operator), UnknownOperator());
 
-        // NOTE: we use the current epoch start timestamp - 1 to ensure that the operator is deregistered
-        // at the end of the current epoch. If we didn't do this, we would have to wait until the next
-        // epoch until the operator was actually deregistered.
-        uint48 time = getCurrentEpochStartTimestamp() - 1;
+        // Deregister the operator in 1 epoch
+        // Operators must be paused for at least 1 epoch before they can be deregistered
+        uint48 time = Time.timestamp();
         _operatorAddresses.unregister(time, EPOCH_DURATION, operator);
         delete operators[operator];
         delete _authorizedSignersByOperator[operator];
@@ -165,9 +164,9 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
     ) external onlyMiddleware {
         require(_operatorAddresses.contains(operator), UnknownOperator());
 
-        // Pause the operator at the end of the current epoch.
-        // Operators are still considered active until the start of the next epoch.
-        uint48 time = getCurrentEpochStartTimestamp() - 1;
+        // Pause the operator in 1 epoch
+        // Operators are still considered active until a full epoch has passed
+        uint48 time = Time.timestamp();
         _operatorAddresses.pause(time, operator);
         emit OperatorPaused(operator, msg.sender);
     }
@@ -181,9 +180,9 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
     ) external onlyMiddleware {
         require(_operatorAddresses.contains(operator), UnknownOperator());
 
-        // Unpause the operator at the start of the next epoch.
-        // Operators are still considered paused until the end of the current epoch.
-        uint48 time = getCurrentEpochStartTimestamp() - 1;
+        // Unpause the operator in 1 epoch
+        // Operators are still considered paused until a full epoch has passed
+        uint48 time = Time.timestamp();
         _operatorAddresses.unpause(time, EPOCH_DURATION, operator);
         emit OperatorUnpaused(operator, msg.sender);
     }
@@ -213,8 +212,8 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         require(_operatorAddresses.contains(operator), UnknownOperator());
         require(signer != address(0), InvalidSigner());
 
-        // Register the signer as active from the current epoch onwards.
-        uint48 time = getCurrentEpochStartTimestamp();
+        // Register the signer as active from now onwards
+        uint48 time = Time.timestamp();
         _authorizedSignersByOperator[operator].register(time, signer);
     }
 
@@ -228,10 +227,9 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         require(_operatorAddresses.contains(operator), UnknownOperator());
         require(_authorizedSignersByOperator[operator].contains(signer), UnknownSigner());
 
-        // Pause the signer from the next epoch onwards. This ensures that the signer must wait for
-        // one full epoch before they aren't considered active anymore (to prevent trying to avoid
-        // being slashed).
-        uint48 time = getCurrentEpochStartTimestamp() - 1;
+        // Pause the signer in 1 epoch.
+        // Signers are still considered active until a full epoch has passed
+        uint48 time = Time.timestamp();
         _authorizedSignersByOperator[operator].pause(time, signer);
     }
 
@@ -245,7 +243,9 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         require(_operatorAddresses.contains(operator), UnknownOperator());
         require(_authorizedSignersByOperator[operator].contains(signer), UnknownSigner());
 
-        uint48 time = getCurrentEpochStartTimestamp() - 1;
+        // Unpause the signer in 1 epoch.
+        // Signers are still considered paused until a full epoch has passed
+        uint48 time = Time.timestamp();
         _authorizedSignersByOperator[operator].unpause(time, EPOCH_DURATION, signer);
     }
 
@@ -259,7 +259,9 @@ contract OperatorsRegistryV2 is IOperatorsRegistryV2, OwnableUpgradeable, UUPSUp
         require(_operatorAddresses.contains(operator), UnknownOperator());
         require(_authorizedSignersByOperator[operator].contains(signer), UnknownSigner());
 
-        uint48 time = getCurrentEpochStartTimestamp() - 1;
+        // Unregister the signer from now onwards. The signer must have been
+        // paused for at least 1 epoch before it can be unregistered.
+        uint48 time = Time.timestamp();
         _authorizedSignersByOperator[operator].unregister(time, EPOCH_DURATION, signer);
     }
 

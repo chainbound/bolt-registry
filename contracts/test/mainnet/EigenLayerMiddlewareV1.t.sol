@@ -33,7 +33,7 @@ interface IDelegationManagerPreELIP002 {
     ) external;
 }
 
-contract EigenLayerMiddlewareV1Test is Test {
+contract EigenLayerMiddlewareV1MainnetTest is Test {
     OperatorsRegistryV1 registry;
     EigenLayerMiddlewareV1 middleware;
 
